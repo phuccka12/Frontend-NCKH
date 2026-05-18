@@ -1,0 +1,1209 @@
+/* Layout & Wrapper */
+.pageContainer {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem;
+  gap: 1.25rem;
+}
+
+/* Header Stylings */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  width: 100%;
+  background: var(--bg-card);
+}
+
+.logoArea {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logoIcon {
+  font-size: 2rem;
+  color: var(--primary);
+  filter: drop-shadow(0 2px 4px rgba(29, 78, 216, 0.1));
+}
+
+.logoTitleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.logoTitle {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1e3a8a; /* Navy Blue matching original app */
+}
+
+.logoSubtitle {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.05em;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+}
+
+.navButton:hover {
+  color: var(--text-primary);
+  background: #f1f5f9;
+}
+
+/* Active tab style matches exactly the solid blue rounded button of original screenshot */
+.navButtonActive {
+  color: #ffffff !important;
+  background: #1e3a8a !important; /* Deep Blue bg */
+  border-color: #1e3a8a !important;
+  box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);
+}
+
+.logoutButton {
+  color: #ef4444 !important;
+}
+
+.logoutButton:hover {
+  background: #fee2e2 !important;
+}
+
+/* Connection Indicator Status */
+.connectionIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ef4444; /* red default */
+}
+
+.statusConnected {
+  background-color: #10b981; /* bright green */
+  box-shadow: 0 0 6px #10b981;
+}
+
+.statusConnecting {
+  background-color: #f59e0b; /* amber orange */
+  animation: pulse-glow 1.5s infinite;
+}
+
+/* 3-Column Workspace Layout */
+.workspace {
+  display: grid;
+  grid-template-columns: 280px 1fr 340px;
+  gap: 1.5rem;
+  align-items: stretch;
+  flex: 1;
+}
+
+/* Sidebar / Left Column */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.25rem;
+  background: var(--bg-card);
+}
+
+.sidebarTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #1e3a8a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scenarioList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  overflow-y: auto;
+  flex: 1;
+  max-height: 480px;
+  padding-right: 0.25rem;
+}
+
+.scenarioCard {
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.scenarioCard:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* Active Scenario card: solid deep blue background, white text */
+.scenarioCardActive {
+  background: #1e3a8a !important; /* Royal/navy blue card background */
+  border-color: #1e3a8a !important;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.15);
+}
+
+.scenarioCardActive .scenarioName {
+  color: #ffffff !important;
+}
+
+.scenarioCardActive .duration {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.scenarioCardActive .difficultyBadge {
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.scenarioHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.scenarioName {
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.checkIcon {
+  color: #10b981;
+  flex-shrink: 0;
+  background: white;
+  border-radius: 50%;
+}
+
+.scenarioCardActive .checkIcon {
+  color: #10b981;
+  background: white;
+}
+
+.scenarioMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+/* Difficulty Badges with pastel colors */
+.difficultyBadge {
+  font-size: 0.725rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+}
+
+.diffEasy {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.diffMedium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.diffHard {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.duration {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Left Sidebar Progress Card */
+.progressContainer {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progressLabel {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.progressLabel span {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.progressLabel strong {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #1e3a8a; /* Solid blue progress fill */
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+.progressSubtext {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Center Main Column */
+.centerPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.viewTitleCard {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+}
+
+.currentScenarioTitle {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1e3a8a; /* Deep blue scenario title */
+}
+
+.currentScenarioDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.versionTag {
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-weight: bold;
+}
+
+/* Simulator Screen Area (Main Visualizer) */
+.screenContainer {
+  position: relative;
+  aspect-ratio: 16 / 9.5;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 2D Grid Simulator */
+.gridSimulator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #85bbf0; /* Beautiful soft simulator blue matching original screenshot */
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.25) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.25) 1px, transparent 1px);
+  background-size: 30px 30px;
+  pointer-events: none;
+}
+
+.coordinateHud {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: #0f172a; /* Black coordinates text */
+  font-weight: 700;
+  z-index: 5;
+  line-height: 1.4;
+}
+
+/* Red Airplane Graphic in 2D Simulator */
+.airplaneContainer {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: left 0.1s linear, top 0.1s linear, transform 0.15s ease-out;
+  transform-origin: center center;
+}
+
+.airplaneVisual {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: plane-drift 3s ease-in-out infinite;
+}
+
+/* The exact red aircraft shape: rectangular fuselage, cross-wings, small tail fins */
+.planeWings {
+  position: absolute;
+  width: 46px;
+  height: 10px;
+  background-color: #ef4444; /* Red wings */
+  border-radius: 4px;
+  top: 18px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.planeFuselage {
+  position: absolute;
+  width: 10px;
+  height: 46px;
+  background-color: #ef4444; /* Red body */
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.planeNose {
+  position: absolute;
+  top: -4px;
+  left: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #0f172a; /* Black nose cap */
+}
+
+.planeTail {
+  position: absolute;
+  width: 24px;
+  height: 6px;
+  background-color: #ef4444; /* Red tail */
+  border-radius: 2px;
+  bottom: 4px;
+}
+
+/* Parking Gate Area at Bottom */
+.parkingGate {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 55px;
+  border: 3px solid #1e293b;
+  border-bottom: none;
+  background: rgba(30, 41, 59, 0.05);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  padding: 2px 0;
+  overflow: hidden;
+}
+
+.gateStripes {
+  width: 100%;
+  height: 5px;
+  background-color: #eab308; /* Yellow stripes matching Gate stripes */
+}
+
+/* Camera viewport and error simulator style */
+.cameraContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  background: #0d0202; /* Extremely dark red/black video fallback */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.cameraMockOverlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: #ffffff;
+  text-align: center;
+  padding: 2rem;
+  z-index: 5;
+}
+
+.cameraMockIcon {
+  color: #ef4444; /* Red exclamation */
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.4));
+}
+
+.cameraErrorTitle {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.cameraErrorSub {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.skeletonOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.skeletonLine {
+  stroke: #10b981; /* Glowing green skeleton */
+  stroke-width: 4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4));
+}
+
+.skeletonJoint {
+  fill: #ffffff;
+  stroke: #10b981;
+  stroke-width: 2.5;
+  r: 5.5;
+  filter: drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4));
+}
+
+/* Bottom Control Toolbar */
+.toolbar {
+  padding: 0.85rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  background: var(--bg-card);
+}
+
+.buttonGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.controlBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 0.6rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.controlBtn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: var(--text-primary);
+}
+
+.controlBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* "Bắt đầu" solid deep blue button style */
+.btnPrimary {
+  background: #1e3a8a !important; /* Navy/royal blue buttons */
+  border-color: #1e3a8a !important;
+  color: #ffffff !important;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: #1e40af !important;
+  border-color: #1e40af !important;
+  box-shadow: 0 4px 6px -1px rgba(30, 58, 138, 0.2);
+}
+
+.btnDanger {
+  color: #ef4444 !important;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #fee2e2 !important;
+  border-color: #fca5a5 !important;
+}
+
+.sliderContainer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  max-width: 200px;
+}
+
+.sliderIcon {
+  color: var(--text-secondary);
+}
+
+.sliderInput {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.sliderInput::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #1e3a8a; /* Blue slider handle */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.1s ease;
+}
+
+.sliderInput::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.sliderVal {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-weight: 700;
+  width: 32px;
+  text-align: right;
+}
+
+/* Right Panel Column */
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Active Gesture Display with grey container matches exactly the original screenshot */
+.gestureCard {
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gestureLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gestureValWrapper {
+  background: #f1f5f9; /* Soft grey background for detected gestures */
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+}
+
+.gestureVal {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.rightDashboardTitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  margin-top: 0.25rem;
+}
+
+/* Stats Cards Grid with exact Pastel theme coloring matching original screenshot */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.statCard {
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.statHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.statTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: inherit;
+}
+
+/* Pastel blue skin accuracy card */
+.statCardBlue {
+  background-color: var(--accent-blue-bg);
+  border-color: var(--accent-blue-border);
+  color: var(--accent-blue-text);
+}
+.statIconBlue { color: var(--accent-blue-text); }
+
+/* Pastel green skin speed card */
+.statCardGreen {
+  background-color: var(--accent-green-bg);
+  border-color: var(--accent-green-border);
+  color: var(--accent-green-text);
+}
+.statIconGreen { color: var(--accent-green-text); }
+
+/* Pastel orange/amber skin time card */
+.statCardOrange {
+  background-color: var(--accent-orange-bg);
+  border-color: var(--accent-orange-border);
+  color: var(--accent-orange-text);
+}
+.statIconOrange { color: var(--accent-orange-text); }
+
+/* Pastel purple/indigo skin confidence card */
+.statCardPurple {
+  background-color: var(--accent-purple-bg);
+  border-color: var(--accent-purple-border);
+  color: var(--accent-purple-text);
+}
+.statIconPurple { color: var(--accent-purple-text); }
+
+.statVal {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-family: var(--font-family);
+  line-height: 1.1;
+}
+
+.statSubText {
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Trend subtext colors */
+.statTrendRed {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ef4444; /* bright red warning */
+  margin-top: 0.1rem;
+}
+
+.statTrendGreen {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #22c55e; /* bright green */
+  margin-top: 0.1rem;
+}
+
+/* Overall Performance Card */
+.performanceCard {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--bg-card);
+}
+
+.performanceHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.performanceTitle {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.performanceVal {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+
+.performanceTrack {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.performanceFill {
+  height: 100%;
+  background: #1e3a8a; /* Solid blue overall fill */
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* View Switcher Button solid deep blue */
+.viewSwitcherButton {
+  margin-top: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* =========================================
+   DASHBOARD / ANALYTICS VIEW
+   ========================================= */
+
+.dashboardView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: transparent;
+}
+
+.dashboardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.dashboardTitle {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  letter-spacing: -0.02em;
+}
+
+.dashboardSubtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+/* Top Dashboard Cards Grid */
+.dbCardsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.dbCard {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  min-height: 130px;
+}
+
+.dbCardHeader {
+  margin-bottom: 0.25rem;
+}
+
+/* Dashboard card pastel themes matching Trainer panels */
+.dbCardBlue {
+  background-color: var(--accent-blue-bg);
+  border-color: var(--accent-blue-border);
+  color: var(--accent-blue-text);
+}
+.dbCardIconBlue { color: var(--accent-blue-text); }
+.dbCardDescBlue { font-size: 0.75rem; font-weight: 600; color: var(--accent-blue-text); }
+
+.dbCardGreen {
+  background-color: var(--accent-green-bg);
+  border-color: var(--accent-green-border);
+  color: var(--accent-green-text);
+}
+.dbCardIconGreen { color: var(--accent-green-text); }
+.dbCardDescGreen { font-size: 0.75rem; font-weight: 600; color: var(--accent-green-text); }
+
+.dbCardOrange {
+  background-color: var(--accent-orange-bg);
+  border-color: var(--accent-orange-border);
+  color: var(--accent-orange-text);
+}
+.dbCardIconOrange { color: var(--accent-orange-text); }
+.dbCardDescOrange { font-size: 0.75rem; font-weight: 600; color: var(--accent-orange-text); }
+
+.dbCardPurple {
+  background-color: var(--accent-purple-bg);
+  border-color: var(--accent-purple-border);
+  color: var(--accent-purple-text);
+}
+.dbCardIconPurple { color: var(--accent-purple-text); }
+.dbCardDescPurple { font-size: 0.75rem; font-weight: 600; color: var(--accent-purple-text); }
+
+.dbCardTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dbCardVal {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* Dashboard Charts cards layout */
+.chartsCardContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.chartCard {
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chartCardTitle {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  border-left: 4px solid #1e3a8a;
+  padding-left: 0.75rem;
+}
+
+.chartContainer {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* =========================================
+   SETTINGS VIEW
+   ========================================= */
+
+.settingsView {
+  max-width: 650px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: var(--bg-card);
+}
+
+.settingsSection {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.settingsSectionTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1e3a8a;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.formLabel {
+  font-size: 0.825rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.formInput {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.65rem 0.9rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: all var(--transition-speed) ease;
+}
+
+.formInput:focus {
+  border-color: #1e3a8a;
+  box-shadow: 0 0 6px rgba(30, 58, 138, 0.15);
+}
+
+.selectInput {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem;
+  padding-right: 2.5rem;
+}
+
+.checkboxGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkboxInput {
+  width: 16px;
+  height: 16px;
+  accent-color: #1e3a8a;
+}
+
+.checkboxLabel {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.settingsSaveButton {
+  margin-top: 1rem;
+  align-self: flex-end;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+}
+
+/* =========================================
+   SUCCESS MODAL POPUP & BACKDROP
+   ========================================= */
+
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  backgroundColor: rgba(15, 23, 42, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  zIndex: 100;
+  backdrop-filter: blur(4px);
+}
+
+.modalCard {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 450px;
+  width: 90%;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.25rem;
+}
+
+.modalAwardCircle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #d1fae5;
+  border: 2px solid #10b981;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.2);
+  color: #065f46;
+}
+
+.modalTitle {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1e3a8a;
+}
+
+.modalDesc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  line-height: 1.5;
+}
+
+.modalMetricsGrid {
+  width: 100%;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.modalMetricCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.modalMetricLabel {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.modalMetricValGreen {
+  font-size: 1.25rem;
+  color: #156534;
+  font-weight: 800;
+}
+
+.modalMetricValBlue {
+  font-size: 1.25rem;
+  color: #1e40af;
+  font-weight: 800;
+}
+
+.modalButtonGroup {
+  display: flex;
+  width: 100%;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1024px) {
+  .workspace {
+    grid-template-columns: 240px 1fr;
+  }
+  .rightPanel {
+    grid-column: span 2;
+    flex-direction: row;
+    align-items: stretch;
+  }
+  .gestureCard {
+    flex: 1;
+  }
+  .statsGrid {
+    flex: 2;
+  }
+  .performanceCard {
+    flex: 1;
+  }
+  .viewSwitcherButton {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .rightPanel {
+    grid-column: span 1;
+    flex-direction: column;
+  }
+  .dbCardsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
