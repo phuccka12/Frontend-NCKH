@@ -13,6 +13,7 @@ import { TelemetryDashboard } from '@/components/TelemetryDashboard';
 import { DashboardView } from '@/components/DashboardView';
 import { SettingsView } from '@/components/SettingsView';
 import { SuccessModal } from '@/components/SuccessModal';
+import { ImageRecognitionView } from '@/components/ImageRecognitionView';
 
 interface Scenario {
   id: string;
@@ -83,14 +84,14 @@ const scenarios: Scenario[] = [
 
 export default function Home() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<'training' | 'dashboard' | 'settings'>('training');
+  const [activeTab, setActiveTab] = useState<'training' | 'dashboard' | 'settings' | 'upload'>('training');
 
   // Scenario States
   const [activeScenarioId, setActiveScenarioId] = useState<string>('1');
   const [completedScenarios, setCompletedScenarios] = useState<string[]>(['1', '5']);
   
   // Custom user settings fields
-  const [socketUrl, setSocketUrl] = useState('http://localhost:5000');
+  const [socketUrl, setSocketUrl] = useState(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000');
   const [selectedCamera, setSelectedCamera] = useState('default-webcam');
   const [enableSkeleton, setEnableSkeleton] = useState(true);
 
@@ -98,6 +99,7 @@ export default function Home() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentView, setCurrentView] = useState<'sim' | 'camera'>('sim');
   const [sensitivity, setSensitivity] = useState(70);
+  const [selectedModel, setSelectedModel] = useState<'dnn' | 'rf'>('dnn');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Active Scenario computed object
@@ -152,7 +154,8 @@ export default function Home() {
     startSession, 
     pauseSession, 
     resetSession,
-    updateSettings 
+    updateSettings,
+    socket
   } = useSocket(socketUrl, (data: TelemetryData) => {
     // If the websocket triggers telemetry events, we directly feed values onto our HUD
     setAirplane({
@@ -167,6 +170,11 @@ export default function Home() {
     setAccuracy(Math.round(data.accuracy * 100));
     setSpeed(data.speed);
     setElapsedTime(data.elapsedTime);
+
+    // Live skeletal joints coordinates from MediaPipe!
+    if (data.points) {
+      setPoints(data.points);
+    }
 
     // Dynamic calculated overall rating
     const currentPerformance = Math.round((data.accuracy * 0.5 + data.confidence * 0.5) * 100);
@@ -431,7 +439,7 @@ export default function Home() {
               isRunning={isRunning}
               enableSkeleton={enableSkeleton}
               points={points}
-              onFrameCaptured={sendVideoFrame}
+              onFrameCaptured={(base64) => sendVideoFrame(base64, selectedModel)}
             />
 
             <ControlToolbar 
@@ -446,6 +454,8 @@ export default function Home() {
                   updateSettings({ sensitivity: val });
                 }
               }}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
             />
           </div>
 
@@ -483,6 +493,13 @@ export default function Home() {
           enableSkeleton={enableSkeleton}
           setEnableSkeleton={setEnableSkeleton}
           onSave={handleSaveSettings}
+        />
+      )}
+
+      {activeTab === 'upload' && (
+        <ImageRecognitionView 
+          socket={socket}
+          isConnected={isConnected}
         />
       )}
 

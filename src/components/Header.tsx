@@ -1,12 +1,12 @@
 'use client';
 
 import React from 'react';
-import { GraduationCap, BarChart3, Settings as SettingsIcon, LogOut } from 'lucide-react';
+import { GraduationCap, BarChart3, Settings as SettingsIcon, LogOut, Image as ImageIcon } from 'lucide-react';
 import styles from '../app/page.module.css';
 
 interface HeaderProps {
-  activeTab: 'training' | 'dashboard' | 'settings';
-  setActiveTab: (tab: 'training' | 'dashboard' | 'settings') => void;
+  activeTab: 'training' | 'dashboard' | 'settings' | 'upload';
+  setActiveTab: (tab: 'training' | 'dashboard' | 'settings' | 'upload') => void;
   isConnected: boolean;
   isConnecting: boolean;
 }
@@ -41,6 +41,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <BarChart3 size={18} />
           Bảng điều khiển
+        </button>
+        <button 
+          className={`${styles.navButton} ${activeTab === 'upload' ? styles.navButtonActive : ''}`}
+          onClick={() => setActiveTab('upload')}
+        >
+          <ImageIcon size={18} />
+          Nhận diện ảnh
         </button>
         <button 
           className={`${styles.navButton} ${activeTab === 'settings' ? styles.navButtonActive : ''}`}

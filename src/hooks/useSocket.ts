@@ -14,24 +14,34 @@ export interface TelemetryData {
 }
 
 export const useSocket = (
-  socketUrl: string = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000',
+  socketUrl: string = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000',
   onTelemetryReceived?: (data: TelemetryData) => void
 ) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
+  // Sử dụng Ref để lưu trữ callback tránh kích hoạt re-connect vòng lặp
+  const onTelemetryReceivedRef = useRef(onTelemetryReceived);
+
+  useEffect(() => {
+    onTelemetryReceivedRef.current = onTelemetryReceived;
+  }, [onTelemetryReceived]);
+
   const connect = useCallback(() => {
     if (socketRef.current?.connected) return;
 
     setIsConnecting(true);
     
-    // Initialize Socket.io client
+    // Initialize Socket.io client with secure authentication token
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       autoConnect: true,
+      auth: {
+        token: 'sk_ai_7Xq9Lm2PzR8vNc4KbY1DfH6TwS3JuE5'
+      }
     });
 
     socket.on('connect', () => {
@@ -52,15 +62,15 @@ export const useSocket = (
       setIsConnecting(false);
     });
 
-    // Listen for real-time telemetry updates from AI server
+    // Lắng nghe sự kiện telemetry cập nhật trạng thái máy bay từ AI Server
     socket.on('telemetry_update', (data: TelemetryData) => {
-      if (onTelemetryReceived) {
-        onTelemetryReceived(data);
+      if (onTelemetryReceivedRef.current) {
+        onTelemetryReceivedRef.current(data);
       }
     });
 
     socketRef.current = socket;
-  }, [socketUrl, onTelemetryReceived]);
+  }, [socketUrl]); // Chỉ phụ thuộc vào socketUrl
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -72,39 +82,39 @@ export const useSocket = (
   }, []);
 
   // Send a video frame (base64) to the AI server for pose-detection
-  const sendVideoFrame = useCallback((base64Frame: string) => {
-    if (socketRef.current && isConnected) {
-      socketRef.current.emit('video_frame', { frame: base64Frame });
+  const sendVideoFrame = useCallback((base64Frame: string, model: string = 'dnn') => {
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit('video_frame', { frame: base64Frame, model });
     }
-  }, [isConnected]);
+  }, []);
 
   // Start training session
   const startSession = useCallback((scenarioId: string) => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('start_session', { scenarioId });
     }
-  }, [isConnected]);
+  }, []);
 
   // Pause training session
   const pauseSession = useCallback(() => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('pause_session');
     }
-  }, [isConnected]);
+  }, []);
 
   // Reset training session
   const resetSession = useCallback(() => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('reset_session');
     }
-  }, [isConnected]);
+  }, []);
 
   // Update AI settings
   const updateSettings = useCallback((settings: { sensitivity: number }) => {
-    if (socketRef.current && isConnected) {
+    if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit('update_settings', settings);
     }
-  }, [isConnected]);
+  }, []);
 
   useEffect(() => {
     // Auto-connect on mount
@@ -125,5 +135,6 @@ export const useSocket = (
     pauseSession,
     resetSession,
     updateSettings,
+    socket: socketRef.current,
   };
 };

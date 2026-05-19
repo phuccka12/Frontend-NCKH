@@ -11,6 +11,8 @@ interface ControlToolbarProps {
   onReset: () => void;
   sensitivity: number;
   onSensitivityChange: (value: number) => void;
+  selectedModel: 'dnn' | 'rf';
+  onModelChange: (model: 'dnn' | 'rf') => void;
 }
 
 export const ControlToolbar: React.FC<ControlToolbarProps> = ({
@@ -20,6 +22,8 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   onReset,
   sensitivity,
   onSensitivityChange,
+  selectedModel,
+  onModelChange,
 }) => {
   return (
     <div className={`${styles.toolbar} glass-panel`}>
@@ -62,6 +66,30 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           className={styles.sliderInput} 
         />
         <span className={styles.sliderVal}>{sensitivity}%</span>
+      </div>
+
+      <div className={styles.sliderContainer} style={{ maxWidth: '240px', borderLeft: '1px solid var(--border-color)', paddingLeft: '1.25rem' }}>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Bộ phân loại:</span>
+        <select 
+          value={selectedModel}
+          onChange={(e) => onModelChange(e.target.value as 'dnn' | 'rf')}
+          className={`${styles.formInput} ${styles.selectInput}`}
+          style={{ 
+            width: '100%', 
+            padding: '0.35rem 0.5rem', 
+            fontSize: '0.8rem', 
+            height: 'auto', 
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '6px',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            outline: 'none'
+          }}
+        >
+          <option value="dnn">Mô hình DNN</option>
+          <option value="rf">Random Forest</option>
+        </select>
       </div>
     </div>
   );
