@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8)
 
 def create_data(base_path):
     X, y = [], []

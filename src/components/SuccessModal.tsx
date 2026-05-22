@@ -22,8 +22,8 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
   onViewReport,
 }) => {
   return (
-    <div className={styles.modalBackdrop}>
-      <div className={`${styles.modalCard} active-glow`}>
+    <div className={styles.modalBackdrop} style={{ zIndex: 1000 }}>
+      <div className={`${styles.modalCard} active-glow`} style={{ zIndex: 1001 }}>
         <div className={styles.modalAwardCircle}>
           <Award size={36} />
         </div>

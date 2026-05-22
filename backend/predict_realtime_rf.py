@@ -34,7 +34,8 @@ while cap.isOpened():
         
         # Vẽ lên màn hình
         cv2.putText(frame, label_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
-        mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+        # Loại bỏ draw_landmarks để tránh vòng lặp feedback - Frontend sẽ vẽ khung xương
+        # mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
     cv2.imshow('Realtime Marshaller - Random Forest', frame)
     if cv2.waitKey(1) & 0xFF == 27: break

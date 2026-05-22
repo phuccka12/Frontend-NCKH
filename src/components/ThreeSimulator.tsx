@@ -40,7 +40,7 @@ export const ThreeSimulator: React.FC<ThreeSimulatorProps> = ({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     
@@ -523,16 +523,16 @@ export const ThreeSimulator: React.FC<ThreeSimulatorProps> = ({
         engineRightLight.intensity = 1.5 * flamePulse;
 
         // Dynamic aeronautical maneuvers
-        if (detectedGesture === 'RẼ TRÁI') {
+        if (detectedGesture === 'LEFT') {
           targetRoll = 0.38; // Left wing bank angle
           targetYaw = 0.16;  // Nose yaw turning angle
-        } else if (detectedGesture === 'RẼ PHẢI') {
+        } else if (detectedGesture === 'RIGHT') {
           targetRoll = -0.38; // Right wing bank angle
           targetYaw = -0.16;  // Nose yaw turning angle
-        } else if (detectedGesture === 'GIẢM TỐC ĐỘ' || detectedGesture === 'DI CHUYỂN THẲNG') {
+        } else if (detectedGesture === 'AHEAD') {
           // Subtle nose-up angle when adjusting throttle
           targetPitch = -0.05;
-        } else if (detectedGesture === 'DỪNG LẠI' || detectedGesture === 'DỪNG KHẨN CẤP') {
+        } else if (detectedGesture === 'STOP' || detectedGesture === 'NONE') {
           // Dim jet flame down
           exhaustLeft.scale.set(0.001, 1.0, 0.001);
           exhaustRight.scale.set(0.001, 1.0, 0.001);
@@ -553,15 +553,15 @@ export const ThreeSimulator: React.FC<ThreeSimulatorProps> = ({
       airplaneGroup.rotation.y = THREE.MathUtils.lerp(airplaneGroup.rotation.y, targetYaw, 0.07);
 
       // Gentle mid-air hovering offset
-      if (isRunning && detectedGesture !== 'DỪNG LẠI') {
+      if (isRunning && detectedGesture !== 'STOP' && detectedGesture !== 'NONE') {
         airplaneGroup.position.y = 1.30 + Math.sin(elapsed * 4.0) * 0.1;
-      } else if (detectedGesture === 'DỪNG LẠI') {
+      } else if (detectedGesture === 'STOP' || detectedGesture === 'NONE') {
         // Soft touchdown physically landing tires onto runway
         airplaneGroup.position.y = THREE.MathUtils.lerp(airplaneGroup.position.y, 1.16, 0.08);
       }
 
       // 5. VOLUMETRIC SCROLLING ROAD ENVIRONMENT LINES (Creates the sensation of forward speed!)
-      if (isRunning && detectedGesture !== 'DỪNG LẠI' && detectedGesture !== 'DỪNG KHẨN CẤP') {
+      if (isRunning && detectedGesture !== 'STOP' && detectedGesture !== 'NONE') {
         const speedFactor = 15.0;
         
         stripesGroup.children.forEach(stripe => {

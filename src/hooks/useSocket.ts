@@ -11,6 +11,9 @@ export interface TelemetryData {
   accuracy: number;
   speed: number;
   elapsedTime: number;
+  points?: any;
+  allPoints?: { cx: number; cy: number }[];
+  frameId?: number;
 }
 
 export const useSocket = (
@@ -20,6 +23,7 @@ export const useSocket = (
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const latestProcessedFrameIdRef = useRef<number>(0);
 
   // Sử dụng Ref để lưu trữ callback tránh kích hoạt re-connect vòng lặp
   const onTelemetryReceivedRef = useRef(onTelemetryReceived);
@@ -64,6 +68,13 @@ export const useSocket = (
 
     // Lắng nghe sự kiện telemetry cập nhật trạng thái máy bay từ AI Server
     socket.on('telemetry_update', (data: TelemetryData) => {
+      if (data.frameId !== undefined && data.frameId !== null) {
+        if (data.frameId < latestProcessedFrameIdRef.current) {
+          // Bỏ qua kết quả cũ đến chậm do xử lý bất đồng bộ
+          return;
+        }
+        latestProcessedFrameIdRef.current = data.frameId;
+      }
       if (onTelemetryReceivedRef.current) {
         onTelemetryReceivedRef.current(data);
       }
@@ -82,9 +93,9 @@ export const useSocket = (
   }, []);
 
   // Send a video frame (base64) to the AI server for pose-detection
-  const sendVideoFrame = useCallback((base64Frame: string, model: string = 'dnn') => {
+  const sendVideoFrame = useCallback((base64Frame: string, model: string = 'dnn', frameId?: number) => {
     if (socketRef.current && socketRef.current.connected) {
-      socketRef.current.emit('video_frame', { frame: base64Frame, model });
+      socketRef.current.emit('video_frame', { frame: base64Frame, model, frameId });
     }
   }, []);
 

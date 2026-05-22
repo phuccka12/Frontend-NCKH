@@ -11,8 +11,6 @@ interface TelemetryDashboardProps {
   elapsedTime: number;
   confidence: number;
   overallPerformance: number;
-  currentView: 'sim' | 'camera';
-  onViewToggle: () => void;
   formatTime: (time: number) => string;
 }
 
@@ -23,8 +21,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({
   elapsedTime,
   confidence,
   overallPerformance,
-  currentView,
-  onViewToggle,
   formatTime,
 }) => {
   return (
@@ -103,24 +99,6 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({
           />
         </div>
       </div>
-
-      {/* View Switcher Button */}
-      <button 
-        className={`${styles.controlBtn} ${styles.btnPrimary} ${styles.viewSwitcherButton}`}
-        onClick={onViewToggle}
-      >
-        {currentView === 'sim' ? (
-          <>
-            <Video size={16} fill="white" />
-            Hiển thị Camera
-          </>
-        ) : (
-          <>
-            <Plane size={16} fill="white" />
-            Hiển thị Mô phỏng
-          </>
-        )}
-      </button>
     </section>
   );
 };

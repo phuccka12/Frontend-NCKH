@@ -4,7 +4,7 @@ import numpy as np
 from tensorflow.keras.models import load_model
 
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+pose = mp_pose.Pose(min_detection_confidence=0.8, min_tracking_confidence=0.8)
 model = load_model('marshaller_model.h5')
 labels = ['AHEAD', 'RIGHT', 'LEFT', 'STOP', 'NONE']
 
@@ -29,7 +29,8 @@ while cap.isOpened():
         color = (0, 255, 0) if labels[class_id] != 'STOP' else (0, 0, 255)
         
         cv2.putText(frame, label, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-        mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+        # Loại bỏ draw_landmarks để tránh vòng lặp feedback - Frontend sẽ vẽ khung xương
+        # mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
     cv2.imshow('Realtime Marshaller Detection', frame)
     if cv2.waitKey(1) & 0xFF == 27: break

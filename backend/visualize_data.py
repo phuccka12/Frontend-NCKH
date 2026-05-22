@@ -3,8 +3,7 @@ import mediapipe as mp
 import os
 
 mp_pose = mp.solutions.pose
-mp_drawing = mp.solutions.drawing_utils
-pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
+pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.8)
 
 def run_check(base_path):
     categories = ['ahead', 'right', 'left', 'stop', 'none']
@@ -15,6 +14,7 @@ def run_check(base_path):
         for img_name in os.listdir(path):
             img = cv2.imread(os.path.join(path, img_name))
             if img is None: continue
+            # img = cv2.flip(img, 1)  # Tạm thời bỏ lật ngang hình ảnh để kiểm tra
             results = pose.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
             if results.pose_landmarks:
                 mp_drawing.draw_landmarks(img, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)

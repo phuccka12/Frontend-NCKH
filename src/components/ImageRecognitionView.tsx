@@ -4,15 +4,48 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Upload, ImageIcon, Cpu, Sparkles, CheckCircle2 } from 'lucide-react';
 import styles from '../app/page.module.css';
 
+const POSE_CONNECTIONS = [
+  // Face/Head
+  [0, 1], [1, 2], [2, 3], [3, 7],
+  [0, 4], [4, 5], [5, 6], [6, 8],
+  [9, 10],
+
+  // Torso and Upper limbs
+  [11, 12], // Left shoulder - Right shoulder
+  [11, 13], [13, 15], // Left arm: shoulder - elbow - wrist
+  [12, 14], [14, 16], // Right arm: shoulder - elbow - wrist
+
+  // Left hand fingers
+  [15, 17], [17, 19], [19, 21], [15, 21],
+  // Right hand fingers
+  [16, 18], [18, 20], [20, 22], [16, 22],
+
+  // Torso side lines & hip
+  [11, 23], [12, 24],
+  [23, 24], // Left hip - Right hip
+
+  // Lower limbs (Legs)
+  [23, 25], [25, 27], // Left leg: hip - knee - ankle
+  [24, 26], [26, 28], // Right leg: hip - knee - ankle
+
+  // Left foot
+  [27, 29], [29, 31], [27, 31],
+  // Right foot
+  [28, 30], [30, 32], [28, 32]
+];
+
 interface ImageRecognitionViewProps {
   socket: any; // Socket.io-client instance
   isConnected: boolean;
+  socketUrl?: string;
 }
 
 export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
   socket,
   isConnected,
+  socketUrl = 'http://localhost:8000',
 }) => {
+  const apiBaseUrl = socketUrl.replace(/\/$/, '');
   const [selectedModel, setSelectedModel] = useState<'dnn' | 'rf'>('dnn');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
@@ -23,6 +56,7 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
     label: string;
     confidence: number;
     points: any;
+    allPoints?: any;
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -31,7 +65,7 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
   // Hàm gọi API nhận diện online bằng fetch POST
   const sendPredictionRequest = async (base64String: string, model: 'dnn' | 'rf') => {
     try {
-      const response = await fetch('https://marshlling.baso.id.vn/predict-image', {
+      const response = await fetch(`${apiBaseUrl}/predict-image`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,6 +86,7 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
         label: data.label,
         confidence: data.confidence,
         points: data.points,
+        allPoints: data.allPoints,
       });
     } catch (error) {
       console.error('Lỗi kết nối tới API nhận diện online:', error);
@@ -59,6 +94,9 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
       setIsProcessing(false);
     }
   };
+
+  const frameSeqRef = useRef<number>(0);
+  const latestProcessedFrameIdRef = useRef<number>(0);
 
   // Vòng lặp capture và nhận diện frame từ video khi đang phát bằng API online
   useEffect(() => {
@@ -68,16 +106,24 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
 
+      // Đặt lại các số thứ tự khi bắt đầu phát video
+      frameSeqRef.current = 0;
+      latestProcessedFrameIdRef.current = 0;
+
       intervalId = setInterval(async () => {
         if (videoRef.current && !videoRef.current.paused && !videoRef.current.ended) {
           // Resize frame về 400x300 để truyền tải nhẹ nhàng
           canvas.width = 400;
           canvas.height = 300;
-          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          }
           const base64String = canvas.toDataURL('image/jpeg', 0.6);
+          frameSeqRef.current += 1;
+          const currentFrameId = frameSeqRef.current;
 
           try {
-            const response = await fetch('https://marshlling.baso.id.vn/predict-image', {
+            const response = await fetch(`${apiBaseUrl}/predict-image`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -86,15 +132,24 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
               body: JSON.stringify({
                 image: base64String,
                 model: selectedModel,
+                frameId: currentFrameId,
               }),
             });
 
             if (response.ok) {
               const data = await response.json();
+
+              // Lọc bỏ phản hồi cũ đến chậm do xử lý bất đồng bộ
+              if (currentFrameId < latestProcessedFrameIdRef.current) {
+                return;
+              }
+              latestProcessedFrameIdRef.current = currentFrameId;
+
               setResult({
                 label: data.label,
                 confidence: data.confidence,
                 points: data.points,
+                allPoints: data.allPoints,
               });
             }
           } catch (err) {
@@ -107,7 +162,7 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [isVideoMode, isPlaying, videoPreview, selectedModel]);
+  }, [isVideoMode, isPlaying, videoPreview, selectedModel, apiBaseUrl]);
 
   // Xử lý khi chọn file ảnh / video từ nút bấm duyệt file
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,24 +251,11 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
     return map[label] || 'Vui lòng đảm bảo hình ảnh/video hiển thị rõ ràng toàn thân từ thắt lưng trở lên của nhân viên điều phối.';
   };
 
-  // Đảo ngược chiều ngang (400 - cx) vì backend mặc định lật ngược tọa độ (1 - x) dành cho luồng webcam trực tiếp
-  const getUnmirroredPoints = (pts: any) => {
-    if (!pts) return null;
-    const res: any = {};
-    for (const key in pts) {
-      if (pts[key] && typeof pts[key].cx === 'number') {
-        res[key] = {
-          cx: 400 - pts[key].cx,
-          cy: pts[key].cy
-        };
-      } else {
-        res[key] = pts[key];
-      }
-    }
-    return res;
-  };
+  // Không cần đảo ngược - Backend đã lật frame rồi
+  const getUnmirroredPoints = (pts: any) => pts;  // Dùng tọa độ gốc
 
   const displayPoints = result && result.points ? getUnmirroredPoints(result.points) : null;
+  const displayAllPoints = result && result.allPoints ? getUnmirroredPoints(result.allPoints) : null;
 
   return (
     <main className="image-recognition-container">
@@ -359,7 +401,8 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
         .preview-image {
           max-width: 100%;
           max-height: 480px;
-          object-fit: contain;
+          width: auto;
+          height: auto;
           border-radius: 12px;
           box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
         }
@@ -373,16 +416,65 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
         }
         .skeleton-line {
           stroke: #10b981;
-          stroke-width: 4;
+          stroke-width: 4.5;
           stroke-linecap: round;
-          filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.8));
+          filter: drop-shadow(0 0 6px rgba(16, 185, 129, 0.7));
+          opacity: 0.85;
+        }
+        .skeleton-line-arm {
+          stroke: #00f2fe;
+          stroke-width: 4.5;
+          stroke-linecap: round;
+          filter: drop-shadow(0 0 8px rgba(0, 242, 254, 0.8));
+          opacity: 0.9;
+        }
+        .skeleton-line-torso {
+          stroke: #ff007f;
+          stroke-width: 5;
+          stroke-linecap: round;
+          filter: drop-shadow(0 0 10px rgba(255, 0, 127, 0.8));
+          opacity: 0.95;
+        }
+        .skeleton-line-leg {
+          stroke: #bd00ff;
+          stroke-width: 4.5;
+          stroke-linecap: round;
+          filter: drop-shadow(0 0 8px rgba(189, 0, 255, 0.7));
+          opacity: 0.85;
+        }
+        .skeleton-line-face {
+          stroke: transparent;
+          stroke-width: 0;
+          opacity: 0;
         }
         .skeleton-joint {
-          fill: #34d399;
+          fill: #00f2fe;
           stroke: #fff;
           stroke-width: 1.5;
-          r: 5;
-          filter: drop-shadow(0 0 4px rgba(52, 211, 153, 0.8));
+          r: 4;
+          filter: drop-shadow(0 0 5px rgba(0, 242, 254, 0.8));
+          transition: all 0.2s ease;
+        }
+        .skeleton-joint-critical {
+          fill: #ff0055;
+          stroke: #fff;
+          stroke-width: 2;
+          r: 5.5;
+          filter: drop-shadow(0 0 8px rgba(255, 0, 85, 0.9));
+        }
+        .skeleton-joint-leg {
+          fill: #bd00ff;
+          stroke: #fff;
+          stroke-width: 1.5;
+          r: 4;
+          filter: drop-shadow(0 0 5px rgba(189, 0, 255, 0.8));
+        }
+        .skeleton-joint-arm {
+          fill: #00f2fe;
+          stroke: #fff;
+          stroke-width: 1.5;
+          r: 4;
+          filter: drop-shadow(0 0 5px rgba(0, 242, 254, 0.8));
         }
         .result-card {
           padding: 1.5rem;
@@ -520,14 +612,14 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
       {/* CỘT TRÁI: UPLOAD VÀ PREVIEW ẢNH / VIDEO */}
       <section className="left-col">
         <div className="model-selector-bar">
-          <button 
+          <button
             className={`model-tab ${selectedModel === 'dnn' ? 'model-tab-active-dnn' : ''}`}
             onClick={() => changeModel('dnn')}
           >
             <Cpu size={16} />
             Mô hình DNN (Deep Learning)
           </button>
-          <button 
+          <button
             className={`model-tab ${selectedModel === 'rf' ? 'model-tab-active-rf' : ''}`}
             onClick={() => changeModel('rf')}
           >
@@ -536,16 +628,16 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
           </button>
         </div>
 
-        <div 
-          className="upload-card glass-panel" 
+        <div
+          className="upload-card glass-panel"
           onClick={triggerFileInput}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
         >
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            onChange={handleFileChange} 
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
             accept="image/*,video/*"
             style={{ display: 'none' }}
           />
@@ -573,97 +665,222 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
           {/* CHẾ ĐỘ 1: XEM TRƯỚC VIDEO VÀ CHỒNG ĐÈ KHUNG XƯƠNG REAL-TIME */}
           {isVideoMode && videoPreview && (
             <div className="preview-wrapper" onClick={(e) => e.stopPropagation()}>
-              <video 
-                ref={videoRef}
-                src={videoPreview} 
-                className="preview-image"
-                controls
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={() => setIsPlaying(false)}
-                style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', borderRadius: '12px' }}
-              />
+              <div style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '480px', borderRadius: '12px', overflow: 'hidden' }}>
+                <video
+                  ref={videoRef}
+                  src={videoPreview}
+                  className="preview-image"
+                  controls
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={() => setIsPlaying(false)}
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '480px', width: 'auto', height: 'auto', borderRadius: '12px' }}
+                />
 
-              {/* Vẽ khung xương SVG chồng lên video đang phát */}
-              {displayPoints && (
-                <svg 
-                  className="skeleton-overlay" 
-                  viewBox="0 0 400 300"
-                  preserveAspectRatio="none"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    zIndex: 10,
-                    pointerEvents: 'none'
-                  }}
-                >
-                  <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.rShoulder.cx} y2={displayPoints.rShoulder.cy} className="skeleton-line" />
-                  <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.lElbow.cx} y2={displayPoints.lElbow.cy} className="skeleton-line" />
-                  <line x1={displayPoints.rShoulder.cx} y1={displayPoints.rShoulder.cy} x2={displayPoints.rElbow.cx} y2={displayPoints.rElbow.cy} className="skeleton-line" />
-                  <line x1={displayPoints.lElbow.cx} y1={displayPoints.lElbow.cy} x2={displayPoints.lWrist.cx} y2={displayPoints.lWrist.cy} className="skeleton-line" />
-                  <line x1={displayPoints.rElbow.cx} y1={displayPoints.rElbow.cy} x2={displayPoints.rWrist.cx} y2={displayPoints.rWrist.cy} className="skeleton-line" />
-                  <line x1={displayPoints.neck.cx} y1={displayPoints.neck.cy} x2={displayPoints.pelvis.cx} y2={displayPoints.pelvis.cy} className="skeleton-line" />
-                  
-                  <circle cx={displayPoints.head.cx} cy={displayPoints.head.cy} className="skeleton-joint" style={{ r: 7 }} />
-                  <circle cx={displayPoints.neck.cx} cy={displayPoints.neck.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.pelvis.cx} cy={displayPoints.pelvis.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lShoulder.cx} cy={displayPoints.lShoulder.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.rShoulder.cx} cy={displayPoints.rShoulder.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lElbow.cx} cy={displayPoints.lElbow.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.rElbow.cx} cy={displayPoints.rElbow.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lWrist.cx} cy={displayPoints.lWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
-                  <circle cx={displayPoints.rWrist.cx} cy={displayPoints.rWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
-                </svg>
-              )}
+                {/* Vẽ khung xương SVG chồng lên video đang phát */}
+                {(displayAllPoints || displayPoints) && (
+                  <svg
+                    className="skeleton-overlay"
+                    viewBox="0 0 400 300"
+                    preserveAspectRatio="none"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    {displayAllPoints && displayAllPoints.length === 33 ? (
+                      <>
+                        {/* Render full 33-point skeleton */}
+                        {POSE_CONNECTIONS.map(([start, end], idx) => {
+                          const startPt = displayAllPoints[start];
+                          const endPt = displayAllPoints[end];
+                          if (!startPt || !endPt) return null;
+
+                          let lineClass = 'skeleton-line';
+                          if (start < 11 && end < 11) {
+                            lineClass = 'skeleton-line-face';
+                          } else if (start >= 23 || end >= 23) {
+                            lineClass = 'skeleton-line-leg';
+                          } else if (
+                            ((start === 11 && end === 12) || (start === 23 && end === 24) ||
+                             (start === 11 && end === 23) || (start === 12 && end === 24))
+                          ) {
+                            lineClass = 'skeleton-line-torso';
+                          } else {
+                            lineClass = 'skeleton-line-arm';
+                          }
+
+                          return (
+                            <line
+                              key={`full-line-${idx}`}
+                              x1={startPt.cx}
+                              y1={startPt.cy}
+                              x2={endPt.cx}
+                              y2={endPt.cy}
+                              className={lineClass}
+                            />
+                          );
+                        })}
+                        {displayAllPoints.map((pt: any, idx: number) => {
+                          if (idx < 11) return null; // Giải phóng khuôn mặt, ẩn toàn bộ khớp mặt rối mắt
+
+                          let jointClass = 'skeleton-joint';
+                          if (idx === 15 || idx === 16) {
+                            jointClass = 'skeleton-joint-critical';
+                          } else if (idx >= 23) {
+                            jointClass = 'skeleton-joint-leg';
+                          } else {
+                            jointClass = 'skeleton-joint-arm';
+                          }
+
+                          return (
+                            <circle
+                              key={`full-joint-${idx}`}
+                              cx={pt.cx}
+                              cy={pt.cy}
+                              className={jointClass}
+                            />
+                          );
+                        })}
+                      </>
+                    ) : displayPoints ? (
+                      <>
+                        {/* Fallback to original 9-point skeleton */}
+                        <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.rShoulder.cx} y2={displayPoints.rShoulder.cy} className="skeleton-line" />
+                        <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.lElbow.cx} y2={displayPoints.lElbow.cy} className="skeleton-line" />
+                        <line x1={displayPoints.rShoulder.cx} y1={displayPoints.rShoulder.cy} x2={displayPoints.rElbow.cx} y2={displayPoints.rElbow.cy} className="skeleton-line" />
+                        <line x1={displayPoints.lElbow.cx} y1={displayPoints.lElbow.cy} x2={displayPoints.lWrist.cx} y2={displayPoints.lWrist.cy} className="skeleton-line" />
+                        <line x1={displayPoints.rElbow.cx} y1={displayPoints.rElbow.cy} x2={displayPoints.rWrist.cx} y2={displayPoints.rWrist.cy} className="skeleton-line" />
+                        <line x1={displayPoints.neck.cx} y1={displayPoints.neck.cy} x2={displayPoints.pelvis.cx} y2={displayPoints.pelvis.cy} className="skeleton-line" />
+
+                        <circle cx={displayPoints.head.cx} cy={displayPoints.head.cy} className="skeleton-joint" style={{ r: 7 }} />
+                        <circle cx={displayPoints.neck.cx} cy={displayPoints.neck.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.pelvis.cx} cy={displayPoints.pelvis.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lShoulder.cx} cy={displayPoints.lShoulder.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.rShoulder.cx} cy={displayPoints.rShoulder.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lElbow.cx} cy={displayPoints.lElbow.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.rElbow.cx} cy={displayPoints.rElbow.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lWrist.cx} cy={displayPoints.lWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
+                        <circle cx={displayPoints.rWrist.cx} cy={displayPoints.rWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
+                      </>
+                    ) : null}
+                  </svg>
+                )}
+              </div>
             </div>
           )}
 
           {/* CHẾ ĐỘ 2: XEM TRƯỚC ẢNH VÀ CHỒNG ĐÈ KHUNG XƯƠNG */}
           {!isVideoMode && imagePreview && (
             <div className="preview-wrapper">
-              <img 
-                src={imagePreview} 
-                alt="Uploaded gesture preview" 
-                className="preview-image"
-              />
+              <div style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '480px', borderRadius: '12px', overflow: 'hidden' }}>
+                <img
+                  src={imagePreview}
+                  alt="Uploaded gesture preview"
+                  className="preview-image"
+                  style={{ display: 'block', maxWidth: '100%', maxHeight: '480px', width: 'auto', height: 'auto', borderRadius: '12px' }}
+                />
 
-              {/* Vẽ khung xương SVG chồng lên ảnh khớp 100% */}
-              {displayPoints && (
-                <svg 
-                  className="skeleton-overlay" 
-                  viewBox="0 0 400 300"
-                  preserveAspectRatio="none"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    zIndex: 10,
-                    pointerEvents: 'none'
-                  }}
-                >
-                  <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.rShoulder.cx} y2={displayPoints.rShoulder.cy} className="skeleton-line" />
-                  <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.lElbow.cx} y2={displayPoints.lElbow.cy} className="skeleton-line" />
-                  <line x1={displayPoints.rShoulder.cx} y1={displayPoints.rShoulder.cy} x2={displayPoints.rElbow.cx} y2={displayPoints.rElbow.cy} className="skeleton-line" />
-                  <line x1={displayPoints.lElbow.cx} y1={displayPoints.lElbow.cy} x2={displayPoints.lWrist.cx} y2={displayPoints.lWrist.cy} className="skeleton-line" />
-                  <line x1={displayPoints.rElbow.cx} y1={displayPoints.rElbow.cy} x2={displayPoints.rWrist.cx} y2={displayPoints.rWrist.cy} className="skeleton-line" />
-                  <line x1={displayPoints.neck.cx} y1={displayPoints.neck.cy} x2={displayPoints.pelvis.cx} y2={displayPoints.pelvis.cy} className="skeleton-line" />
-                  
-                  <circle cx={displayPoints.head.cx} cy={displayPoints.head.cy} className="skeleton-joint" style={{ r: 7 }} />
-                  <circle cx={displayPoints.neck.cx} cy={displayPoints.neck.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.pelvis.cx} cy={displayPoints.pelvis.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lShoulder.cx} cy={displayPoints.lShoulder.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.rShoulder.cx} cy={displayPoints.rShoulder.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lElbow.cx} cy={displayPoints.lElbow.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.rElbow.cx} cy={displayPoints.rElbow.cy} className="skeleton-joint" />
-                  <circle cx={displayPoints.lWrist.cx} cy={displayPoints.lWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
-                  <circle cx={displayPoints.rWrist.cx} cy={displayPoints.rWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
-                </svg>
-              )}
+                {/* Vẽ khung xương SVG chồng lên ảnh khớp 100% */}
+                {(displayAllPoints || displayPoints) && (
+                  <svg
+                    className="skeleton-overlay"
+                    viewBox="0 0 400 300"
+                    preserveAspectRatio="none"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    {displayAllPoints && displayAllPoints.length === 33 ? (
+                      <>
+                        {/* Render full 33-point skeleton */}
+                        {POSE_CONNECTIONS.map(([start, end], idx) => {
+                          const startPt = displayAllPoints[start];
+                          const endPt = displayAllPoints[end];
+                          if (!startPt || !endPt) return null;
+
+                          let lineClass = 'skeleton-line';
+                          if (start < 11 && end < 11) {
+                            lineClass = 'skeleton-line-face';
+                          } else if (start >= 23 || end >= 23) {
+                            lineClass = 'skeleton-line-leg';
+                          } else if (
+                            ((start === 11 && end === 12) || (start === 23 && end === 24) ||
+                             (start === 11 && end === 23) || (start === 12 && end === 24))
+                          ) {
+                            lineClass = 'skeleton-line-torso';
+                          } else {
+                            lineClass = 'skeleton-line-arm';
+                          }
+
+                          return (
+                            <line
+                              key={`full-line-${idx}`}
+                              x1={startPt.cx}
+                              y1={startPt.cy}
+                              x2={endPt.cx}
+                              y2={endPt.cy}
+                              className={lineClass}
+                            />
+                          );
+                        })}
+                        {displayAllPoints.map((pt: any, idx: number) => {
+                          if (idx < 11) return null; // Giải phóng khuôn mặt, ẩn toàn bộ khớp mặt rối mắt
+
+                          let jointClass = 'skeleton-joint';
+                          if (idx === 15 || idx === 16) {
+                            jointClass = 'skeleton-joint-critical';
+                          } else if (idx >= 23) {
+                            jointClass = 'skeleton-joint-leg';
+                          } else {
+                            jointClass = 'skeleton-joint-arm';
+                          }
+
+                          return (
+                            <circle
+                              key={`full-joint-${idx}`}
+                              cx={pt.cx}
+                              cy={pt.cy}
+                              className={jointClass}
+                            />
+                          );
+                        })}
+                      </>
+                    ) : displayPoints ? (
+                      <>
+                        {/* Fallback to original 9-point skeleton */}
+                        <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.rShoulder.cx} y2={displayPoints.rShoulder.cy} className="skeleton-line" />
+                        <line x1={displayPoints.lShoulder.cx} y1={displayPoints.lShoulder.cy} x2={displayPoints.lElbow.cx} y2={displayPoints.lElbow.cy} className="skeleton-line" />
+                        <line x1={displayPoints.rShoulder.cx} y1={displayPoints.rShoulder.cy} x2={displayPoints.rElbow.cx} y2={displayPoints.rElbow.cy} className="skeleton-line" />
+                        <line x1={displayPoints.lElbow.cx} y1={displayPoints.lElbow.cy} x2={displayPoints.lWrist.cx} y2={displayPoints.lWrist.cy} className="skeleton-line" />
+                        <line x1={displayPoints.rElbow.cx} y1={displayPoints.rElbow.cy} x2={displayPoints.rWrist.cx} y2={displayPoints.rWrist.cy} className="skeleton-line" />
+                        <line x1={displayPoints.neck.cx} y1={displayPoints.neck.cy} x2={displayPoints.pelvis.cx} y2={displayPoints.pelvis.cy} className="skeleton-line" />
+
+                        <circle cx={displayPoints.head.cx} cy={displayPoints.head.cy} className="skeleton-joint" style={{ r: 7 }} />
+                        <circle cx={displayPoints.neck.cx} cy={displayPoints.neck.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.pelvis.cx} cy={displayPoints.pelvis.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lShoulder.cx} cy={displayPoints.lShoulder.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.rShoulder.cx} cy={displayPoints.rShoulder.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lElbow.cx} cy={displayPoints.lElbow.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.rElbow.cx} cy={displayPoints.rElbow.cy} className="skeleton-joint" />
+                        <circle cx={displayPoints.lWrist.cx} cy={displayPoints.lWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
+                        <circle cx={displayPoints.rWrist.cx} cy={displayPoints.rWrist.cy} className="skeleton-joint" style={{ fill: '#3b82f6' }} />
+                      </>
+                    ) : null}
+                  </svg>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -688,10 +905,10 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
               <div className="confidence-circle-container">
                 <svg width="130" height="130">
                   <circle cx="65" cy="65" r="54" className="circle-bg" />
-                  <circle 
-                    cx="65" 
-                    cy="65" 
-                    r="54" 
+                  <circle
+                    cx="65"
+                    cy="65"
+                    r="54"
                     className="circle-progress"
                     stroke={selectedModel === 'dnn' ? '#6366f1' : '#fbbf24'}
                     strokeDasharray={2 * Math.PI * 54}
@@ -704,9 +921,8 @@ export const ImageRecognitionView: React.FC<ImageRecognitionViewProps> = ({
               </div>
 
               {/* Badge cử chỉ */}
-              <div className={`gesture-badge ${
-                result.label === 'AHEAD' ? 'badge-ahead' : (result.label === 'STOP' ? 'badge-stop' : (result.label === 'NONE' ? 'badge-none' : 'badge-turn'))
-              }`}>
+              <div className={`gesture-badge ${result.label === 'AHEAD' ? 'badge-ahead' : (result.label === 'STOP' ? 'badge-stop' : (result.label === 'NONE' ? 'badge-none' : 'badge-turn'))
+                }`}>
                 {getGestureNameVi(result.label)}
               </div>
 

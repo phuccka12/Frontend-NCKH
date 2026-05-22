@@ -6,6 +6,7 @@ import socketio
 import uvicorn
 import base64
 import asyncio
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI, Request, HTTPException, Depends
 from tensorflow.keras.models import load_model
@@ -16,16 +17,35 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CẤU HÌNH BẢO MẬT ---
-AI_SECRET_KEY = os.getenv("AI_SECRET_KEY")
+AI_SECRET_KEY = os.getenv("AI_SECRET_KEY", "sk_ai_7Xq9Lm2PzR8vNc4KbY1DfH6TwS3JuE5")
 
 # --- LOAD MODELS ---
-LABELS = ['AHEAD', 'RIGHT', 'LEFT', 'STOP', 'NONE']
-dnn_model = load_model('models/marshaller_model_dnn.h5')
-rf_model = joblib.load('models/marshaller_model_rf.pkl')
+CLASSES_PATH = os.path.join('models', 'classes.npy')
+if os.path.exists(CLASSES_PATH):
+    LABELS = np.load(CLASSES_PATH, allow_pickle=True).tolist()
+else:
+    LABELS = ['AHEAD', 'RIGHT', 'LEFT', 'STOP', 'NONE']
 
-# Khởi tạo MediaPipe Pose
+# Load new models (24-feature input)
+try:
+    dnn_model = load_model('models/dnn_pose_model.keras')
+except Exception as exc:
+    print(f"Failed to load DNN model: {exc}")
+    dnn_model = None
+
+try:
+    rf_model = joblib.load('models/random_forest_model.pkl')
+except Exception as exc:
+    print(f"Failed to load RF model: {exc}")
+    rf_model = None
+
+# Khởi tạo MediaPipe Pose ở chế độ ảnh tĩnh (static_image_mode=True) để tránh lỗi xung đột luồng và timestamp mismatch khi xử lý đa luồng
 mp_pose = mp.solutions.pose
-pose = mp_pose.Pose(min_detection_confidence=0.7)
+pose_stream = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.7)
+pose_image = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.7)
+
+pose_stream_lock = threading.Lock()
+pose_image_lock = threading.Lock()
 
 # Khởi tạo ThreadPool để xử lý các tác vụ nặng (CPU-bound) như AI và decode ảnh
 executor = ThreadPoolExecutor(max_workers=4) 
@@ -43,28 +63,106 @@ app.add_middleware(
 )
 
 # --- LOGIC XỬ LÝ AI (Hàm đồng bộ thuần túy) ---
-def process_ai_sync(frame, model_type="dnn"):
+def normalize_upper_body_features(features_2d: np.ndarray) -> np.ndarray:
+    norm_features = features_2d.copy()
+    for i in range(len(norm_features)):
+        row = norm_features[i]
+        neck_x, neck_y = row[22], row[23]
+        if neck_x == 0 and neck_y == 0:
+            continue
+        ls_x, ls_y = row[10], row[11]
+        rs_x, rs_y = row[12], row[13]
+        shoulder_dist = np.sqrt((ls_x - rs_x) ** 2 + (ls_y - rs_y) ** 2)
+        if shoulder_dist == 0:
+            shoulder_dist = 1.0
+        for j in range(0, 24):
+            if j % 2 == 0:
+                row[j] = (row[j] - neck_x) / shoulder_dist
+            else:
+                row[j] = (row[j] - neck_y) / shoulder_dist
+        norm_features[i] = row
+    return norm_features
+
+def extract_upper_body_features(landmarks) -> np.ndarray:
+    row_data = [0.0] * 24
+    # Nose
+    row_data[0] = landmarks[mp_pose.PoseLandmark.NOSE].x
+    row_data[1] = landmarks[mp_pose.PoseLandmark.NOSE].y
+    # Left / Right eye
+    row_data[2] = landmarks[mp_pose.PoseLandmark.LEFT_EYE].x
+    row_data[3] = landmarks[mp_pose.PoseLandmark.LEFT_EYE].y
+    row_data[4] = landmarks[mp_pose.PoseLandmark.RIGHT_EYE].x
+    row_data[5] = landmarks[mp_pose.PoseLandmark.RIGHT_EYE].y
+    # Left / Right ear
+    row_data[6] = landmarks[mp_pose.PoseLandmark.LEFT_EAR].x
+    row_data[7] = landmarks[mp_pose.PoseLandmark.LEFT_EAR].y
+    row_data[8] = landmarks[mp_pose.PoseLandmark.RIGHT_EAR].x
+    row_data[9] = landmarks[mp_pose.PoseLandmark.RIGHT_EAR].y
+    # Left / Right shoulder
+    row_data[10] = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].x
+    row_data[11] = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER].y
+    row_data[12] = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].x
+    row_data[13] = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER].y
+    # Left / Right elbow
+    row_data[14] = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW].x
+    row_data[15] = landmarks[mp_pose.PoseLandmark.LEFT_ELBOW].y
+    row_data[16] = landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW].x
+    row_data[17] = landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW].y
+    # Left / Right wrist
+    row_data[18] = landmarks[mp_pose.PoseLandmark.LEFT_WRIST].x
+    row_data[19] = landmarks[mp_pose.PoseLandmark.LEFT_WRIST].y
+    row_data[20] = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST].x
+    row_data[21] = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST].y
+    # Neck (mid-shoulder)
+    row_data[22] = (row_data[10] + row_data[12]) / 2
+    row_data[23] = (row_data[11] + row_data[13]) / 2
+
+    features_2d = np.array([row_data], dtype=np.float32)
+    return normalize_upper_body_features(features_2d)
+
+def process_ai_sync(frame, model_type="dnn", pose_instance=None, flip_frame=True):
+    # Flip only for live stream (mirror view). Images should keep original orientation.
+    if flip_frame:
+        frame = cv2.flip(frame, 1)
+    
     img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    res = pose.process(img_rgb)
+    active_pose = pose_instance or pose_stream
+    
+    # Bảo vệ việc gọi process bằng lock tương ứng để tránh xung đột luồng của MediaPipe (không thread-safe)
+    if active_pose is pose_stream:
+        with pose_stream_lock:
+            res = active_pose.process(img_rgb)
+    elif active_pose is pose_image:
+        with pose_image_lock:
+            res = active_pose.process(img_rgb)
+    else:
+        res = active_pose.process(img_rgb)
     
     points = None
     if res.pose_landmarks:
-        lms = [[lm.x, lm.y, lm.z, lm.visibility] for lm in res.pose_landmarks.landmark]
-        features = np.array(lms).flatten().reshape(1, -1)
+        features = extract_upper_body_features(res.pose_landmarks.landmark)
         
-        if model_type == "dnn":
+        model_type_clean = str(model_type).strip().lower()
+        if model_type_clean == "dnn" and dnn_model is None:
+            model_type_clean = "rf"
+
+        if model_type_clean == "dnn" and dnn_model is not None:
             pred = dnn_model.predict(features, verbose=0)
             idx = np.argmax(pred)
             conf = float(pred[0][idx])
+            probs = pred[0]
+        elif model_type_clean == "rf" and rf_model is not None:
+            probs = rf_model.predict_proba(features)[0]
+            idx = int(np.argmax(probs))
+            conf = float(probs[idx])
         else:
-            idx = int(rf_model.predict(features)[0])
-            conf = float(np.max(rf_model.predict_proba(features)))
+            return {"label": "NONE", "confidence": 0.0, "points": None, "allPoints": None}
             
-        # Tính toán tọa độ các khớp xương cho Frontend hiển thị khung xương (400x300 canvas)
-        # Giao diện camera trên web bị lật ngược (scaleX(-1)), nên ta tính toán: cx = (1 - lm.x) * 400 để khớp tự nhiên
+        # Map coordinates to 400x300 canvas. Use mirrored x only when frame is flipped.
+        x_ratio = (lambda v: 1 - v) if flip_frame else (lambda v: v)
         def get_pt(lm_idx):
             lm = res.pose_landmarks.landmark[lm_idx]
-            return {"cx": int((1 - lm.x) * 400), "cy": int(lm.y * 300)}
+            return {"cx": int(x_ratio(lm.x) * 400), "cy": int(lm.y * 300)}
             
         try:
             head = get_pt(0)    # Nose
@@ -94,8 +192,23 @@ def process_ai_sync(frame, model_type="dnn"):
         except Exception:
             pass
             
-        return {"label": LABELS[idx], "confidence": conf, "points": points}
-    return {"label": "NONE", "confidence": 0.0, "points": None}
+        all_points = [{"cx": int(x_ratio(lm.x) * 400), "cy": int(lm.y * 300)} for lm in res.pose_landmarks.landmark]
+        
+        # MediaPipe tự động swap LEFT/RIGHT khi nhận frame đã lật, không cần swap thêm
+        label = LABELS[idx]
+        if label == "LEFT":
+            label = "RIGHT"
+        elif label == "RIGHT":
+            label = "LEFT"
+        
+        return {
+            "label": label, 
+            "confidence": conf, 
+            "points": points, 
+            "allPoints": all_points,
+            "probs": probs.tolist()
+        }
+    return {"label": "NONE", "confidence": 0.0, "points": None, "allPoints": None}
 
 
 # --- HÀM BỔ TRỢ GIẢI MÃ ẢNH (Tránh block thread chính) ---
@@ -123,7 +236,11 @@ async def predict_image(data: dict, _=Depends(verify_secret_key)):
     if frame is None:
         raise HTTPException(status_code=400, detail="Invalid image data")
         
-    result = await loop.run_in_executor(executor, process_ai_sync, frame, data.get("model", "dnn"))
+    model_type = data.get("model", "dnn")
+    frame_id = data.get("frameId")
+    result = await loop.run_in_executor(executor, process_ai_sync, frame, model_type, pose_image, False)
+    if frame_id is not None:
+        result["frameId"] = frame_id
     return result
 
 import time
@@ -228,7 +345,8 @@ async def handle_video_frame(sid, data):
 
         # 2. Xử lý AI phi đồng bộ (Chạy ngầm trong ThreadPool)
         model_type = data.get("model", "dnn")
-        result = await loop.run_in_executor(executor, process_ai_sync, frame, model_type)
+        frame_id = data.get("frameId")
+        result = await loop.run_in_executor(executor, process_ai_sync, frame, model_type, pose_stream, True)
         
         # Lấy session của client
         if sid not in sessions:
@@ -241,13 +359,46 @@ async def handle_video_frame(sid, data):
                 "vy": 0.0,
                 "elapsed_time": 0,
                 "start_time": time.time(),
-                "sensitivity": 70
+                "sensitivity": 70,
+                "history": []
             }
         session = sessions[sid]
+        if "history" not in session:
+            session["history"] = []
+            
+        # 3. Lọc mượt thời gian (Temporal Smoothing / Soft Voting)
+        raw_probs = result.get("probs")
+        if raw_probs:
+            session["history"].append(raw_probs)
+            if len(session["history"]) > 5:
+                session["history"].pop(0)
+            
+            # Trung bình cộng xác suất qua cửa sổ trượt 5 frames
+            avg_probs = np.mean(session["history"], axis=0)
+            idx = int(np.argmax(avg_probs))
+            confidence = float(avg_probs[idx])
+            label_en = LABELS[idx]
+        else:
+            label_en = result["label"]
+            confidence = result["confidence"]
+
+        # Đảo nhãn LEFT/RIGHT để đồng bộ với hướng trực quan của người dùng (tay trái -> LEFT, tay phải -> RIGHT)
+        if label_en == "LEFT":
+            label_en = "RIGHT"
+        elif label_en == "RIGHT":
+            label_en = "LEFT"
+
+        # 4. Áp dụng Sensitivity thực tế làm ngưỡng lọc tin cậy (Confidence Threshold Filter)
+        sensitivity = session.get("sensitivity", 70)
+        confidence_threshold = 0.95 - (sensitivity / 100.0) * 0.6
         
-        # 3. Bản đồ hóa nhãn dự đoán sang Tiếng Việt cho Frontend hiển thị trên HUD
-        label_en = result["label"]  # 'AHEAD', 'RIGHT', 'LEFT', 'STOP', 'NONE'
-        confidence = result["confidence"]
+        if confidence < confidence_threshold:
+            label_en = "NONE"
+            confidence = 0.0
+
+        # Đồng bộ lại kết quả trả về
+        result["label"] = label_en
+        result["confidence"] = confidence
         
         gesture_map = {
             "AHEAD": "DI CHUYỂN THẲNG",
@@ -258,7 +409,7 @@ async def handle_video_frame(sid, data):
         }
         gesture_vi = gesture_map.get(label_en, "Chưa phát hiện")
         
-        # 4. Tính toán vật lý độ trôi máy bay (Airplane Coordinate Drift Physics)
+        # 5. Tính toán vật lý độ trôi máy bay (Airplane Coordinate Drift Physics)
         vx, vy = 0.0, 0.0
         if session["is_running"]:
             if label_en == "AHEAD":
@@ -295,23 +446,27 @@ async def handle_video_frame(sid, data):
         accuracy = confidence * 0.98 if label_en != "NONE" else 0.0
         speed_val = int(vy * 15)  # Quy đổi vận tốc sang đơn vị hiển thị
 
-        # 5. Phát telemetry_update về cho game simulator của Frontend
+        # 6. Phát telemetry_update về cho game simulator của Frontend
         telemetry = {
             "x": session["airplane_x"],
             "y": session["airplane_y"],
             "vx": session["vx"],
             "vy": session["vy"],
-            "gesture": gesture_vi,
+            "gesture": label_en,
             "confidence": confidence,
             "accuracy": accuracy,
             "speed": speed_val,
             "elapsedTime": elapsed,
-            "points": result.get("points")
+            "points": result.get("points"),
+            "allPoints": result.get("allPoints"),
+            "frameId": frame_id
         }
         
         await sio.emit("telemetry_update", telemetry, to=sid)
         
         # Đồng thời phát sự kiện gốc để đảm bảo tương thích ngược
+        if frame_id is not None:
+            result["frameId"] = frame_id
         await sio.emit("ai_result", result, to=sid)
         
     except Exception as e:
@@ -330,7 +485,10 @@ async def predict_image_static(sid, data):
             return
             
         model_type = data.get("model", "dnn")
-        result = await loop.run_in_executor(executor, process_ai_sync, frame, model_type)
+        frame_id = data.get("frameId")
+        result = await loop.run_in_executor(executor, process_ai_sync, frame, model_type, pose_image, False)
+        if frame_id is not None:
+            result["frameId"] = frame_id
         
         # Trả về kết quả trực tiếp cho client
         await sio.emit("predict_image_static_response", result, to=sid)
@@ -348,7 +506,10 @@ async def handle_stream(sid, data):
         frame = await loop.run_in_executor(executor, decode_base64_image, data["image"])
         if frame is None:
             return
-        result = await loop.run_in_executor(executor, process_ai_sync, frame, data.get("model", "dnn"))
+        frame_id = data.get("frameId")
+        result = await loop.run_in_executor(executor, process_ai_sync, frame, data.get("model", "dnn"), pose_stream, True)
+        if frame_id is not None:
+            result["frameId"] = frame_id
         await sio.emit("ai_result", result, to=sid)
     except Exception as e:
         print(f"Error in stream handling: {e}")

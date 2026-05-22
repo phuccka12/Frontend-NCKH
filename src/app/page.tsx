@@ -33,7 +33,7 @@ const scenarios: Scenario[] = [
     difficulty: 'easy',
     difficultyText: 'Cơ bản',
     duration: '5 phút',
-    expectedGestures: ['DI CHUYỂN THẲNG', 'GIẢM TỐC ĐỘ', 'DỪNG LẠI']
+    expectedGestures: ['AHEAD', 'STOP']
   },
   {
     id: '2',
@@ -42,7 +42,7 @@ const scenarios: Scenario[] = [
     difficulty: 'easy',
     difficultyText: 'Cơ bản',
     duration: '8 phút',
-    expectedGestures: ['DI CHUYỂN THẲNG', 'GIẢM TỐC ĐỘ', 'DỪNG LẠI']
+    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'STOP']
   },
   {
     id: '3',
@@ -51,7 +51,7 @@ const scenarios: Scenario[] = [
     difficulty: 'medium',
     difficultyText: 'Trung bình',
     duration: '10 phút',
-    expectedGestures: ['RẼ TRÁI', 'RẼ PHẢI', 'DI CHUYỂN THẲNG', 'DỪNG LẠI']
+    expectedGestures: ['LEFT', 'AHEAD', 'RIGHT', 'AHEAD', 'LEFT', 'STOP']
   },
   {
     id: '4',
@@ -60,7 +60,7 @@ const scenarios: Scenario[] = [
     difficulty: 'medium',
     difficultyText: 'Trung bình',
     duration: '12 phút',
-    expectedGestures: ['DỪNG KHẨN CẤP']
+    expectedGestures: ['AHEAD', 'STOP', 'STOP']
   },
   {
     id: '5',
@@ -69,7 +69,7 @@ const scenarios: Scenario[] = [
     difficulty: 'hard',
     difficultyText: 'Nâng cao',
     duration: '15 phút',
-    expectedGestures: ['DI CHUYỂN THẲNG', 'RẼ TRÁI', 'RẼ PHẢI', 'DỪNG LẠI']
+    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'AHEAD', 'STOP']
   },
   {
     id: '6',
@@ -78,9 +78,18 @@ const scenarios: Scenario[] = [
     difficulty: 'hard',
     difficultyText: 'Nâng cao',
     duration: '20 phút',
-    expectedGestures: ['DI CHUYỂN THẲNG', 'GIẢM TỐC ĐỘ', 'RẼ TRÁI', 'RẼ PHẢI', 'DỪNG LẠI']
+    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'LEFT', 'STOP']
   }
 ];
+
+const gestureRules: Record<string, { minConfidence: number; holdMs: number }> = {
+  AHEAD: { minConfidence: 0.35, holdMs: 2200 },
+  LEFT: { minConfidence: 0.35, holdMs: 2600 },
+  RIGHT: { minConfidence: 0.35, holdMs: 2600 },
+  STOP: { minConfidence: 0.4, holdMs: 1800 },
+  NONE: { minConfidence: 0.0, holdMs: 2000 }
+};
+const gestureResetGapMs = 500;
 
 export default function Home() {
   // Navigation State
@@ -97,7 +106,7 @@ export default function Home() {
 
   // App core simulator/ticking states
   const [isRunning, setIsRunning] = useState(false);
-  const [currentView, setCurrentView] = useState<'sim' | 'camera'>('sim');
+  const [currentView, setCurrentView] = useState<'sim' | 'camera'>('camera'); // Default to camera
   const [sensitivity, setSensitivity] = useState(70);
   const [selectedModel, setSelectedModel] = useState<'dnn' | 'rf'>('dnn');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -109,9 +118,9 @@ export default function Home() {
 
   // Telemetry metric states (live updates)
   const [airplane, setAirplane] = useState({
-    x: 50, // 0 - 100 canvas percentage
-    y: 15, // start near the top
-    angle: 0, // degrees
+    x: 50,
+    y: 15,
+    angle: 0,
     vx: 0,
     vy: 0
   });
@@ -146,6 +155,107 @@ export default function Home() {
     rWrist: { cx: 280, cy: 215 }
   });
 
+  const [allPoints, setAllPoints] = useState<{ cx: number; cy: number }[] | null>(null);
+
+  // Training dynamic progress tracking
+  const [activeGestureIndex, setActiveGestureIndex] = useState<number>(0);
+  const [gestureHoldProgress, setGestureHoldProgress] = useState<number>(0);
+  const [lastDetectedGesture, setLastDetectedGesture] = useState<string>('NONE');
+  const lastProgressResetRef = useRef<number>(0);
+  const needsGestureResetRef = useRef<boolean>(false);
+  const lastCompletedGestureRef = useRef<string>('');
+  const matchingStartRef = useRef<number | null>(null);
+  const resetGapStartRef = useRef<number | null>(null);
+  const lastTargetRef = useRef<string>('');
+
+  const updateGestureProgress = (detected: string, confidenceVal: number) => {
+    // Cập nhật lần phát hiện cuối cùng
+    setLastDetectedGesture(detected);
+    
+    const targetGesture = activeScenario.expectedGestures[activeGestureIndex];
+    if (!targetGesture) return;
+
+    const isMatching = detected.trim().toUpperCase() === targetGesture.trim().toUpperCase();
+
+    console.log('isMatching:', isMatching, 'confidenceVal:', confidenceVal, 'activeGestureIndex:', activeGestureIndex, 'expectedGestures:', activeScenario.expectedGestures);
+    console.log('showSuccessModal:', showSuccessModal);
+
+    const detectedUpper = detected.trim().toUpperCase();
+    const targetUpper = targetGesture.trim().toUpperCase();
+
+    if (needsGestureResetRef.current) {
+      if (detectedUpper === lastCompletedGestureRef.current) {
+        // Chưa rời khỏi cử chỉ trước đó, không tính tiến trình mới
+        resetGapStartRef.current = null;
+        return;
+      }
+      if (resetGapStartRef.current === null) {
+        resetGapStartRef.current = Date.now();
+        return;
+      }
+      if (Date.now() - resetGapStartRef.current < gestureResetGapMs) {
+        // Cần giữ trạng thái khác cử chỉ cũ đủ lâu
+        return;
+      }
+      // Đã rời khỏi cử chỉ cũ đủ lâu, cho phép bắt đầu cử chỉ mới
+      needsGestureResetRef.current = false;
+      resetGapStartRef.current = null;
+    }
+
+    const rule = gestureRules[targetUpper] || { minConfidence: 0.35, holdMs: 2200 };
+    if (isMatching && confidenceVal >= rule.minConfidence) {
+      // Yêu cầu 500ms đã trôi qua kể từ lần hoàn thành cử chỉ trước để tránh transition quá nhanh
+      const timeSinceReset = Date.now() - lastProgressResetRef.current;
+      if (timeSinceReset < gestureResetGapMs) {
+        // Quá nhanh - bỏ qua, đây có thể là dư âm cử chỉ cũ
+        return;
+      }
+
+      if (lastTargetRef.current !== targetUpper || matchingStartRef.current === null) {
+        matchingStartRef.current = Date.now();
+        lastTargetRef.current = targetUpper;
+      }
+
+      const elapsed = Date.now() - (matchingStartRef.current || Date.now());
+      const requiredHoldMs = rule.holdMs;
+      const progress = Math.min(100, Math.round((elapsed / requiredHoldMs) * 100));
+      setGestureHoldProgress(progress);
+
+      if (elapsed >= requiredHoldMs) {
+        // Ghi nhận thời điểm hoàn thành
+        lastProgressResetRef.current = Date.now();
+        needsGestureResetRef.current = true;
+        lastCompletedGestureRef.current = targetUpper;
+        matchingStartRef.current = null;
+        setGestureHoldProgress(0);
+
+        // Hoàn thành cử chỉ hiện tại
+        if (activeGestureIndex + 1 >= activeScenario.expectedGestures.length) {
+          // Hoàn thành toàn bộ kịch bản huấn luyện!
+          setIsRunning(false);
+          setShowSuccessModal(true);
+          
+          // Lưu kịch bản hoàn thành
+          if (!completedScenarios.includes(activeScenarioId)) {
+            setCompletedScenarios(prevList => [...prevList, activeScenarioId]);
+          }
+          
+          const finalAccuracy = Math.round(confidenceVal * 100);
+          setScoresData(prevScores => ({
+            ...prevScores,
+            [activeScenarioId]: Math.max(prevScores[activeScenarioId] || 0, finalAccuracy)
+          }));
+        } else {
+          setActiveGestureIndex(idx => idx + 1);
+        }
+      }
+    } else {
+      // Mất khớp -> reset thời gian giữ cử chỉ
+      matchingStartRef.current = null;
+      setGestureHoldProgress(prev => Math.max(0, prev - 10));
+    }
+  };
+
   // Real-time Socket io custom React Hook
   const { 
     isConnected, 
@@ -158,13 +268,6 @@ export default function Home() {
     socket
   } = useSocket(socketUrl, (data: TelemetryData) => {
     // If the websocket triggers telemetry events, we directly feed values onto our HUD
-    setAirplane({
-      x: data.x,
-      y: data.y,
-      vx: data.vx,
-      vy: data.vy,
-      angle: data.vx * 30 // angle drifts with x-velocity
-    });
     setDetectedGesture(data.gesture);
     setConfidence(Math.round(data.confidence * 100));
     setAccuracy(Math.round(data.accuracy * 100));
@@ -175,20 +278,31 @@ export default function Home() {
     if (data.points) {
       setPoints(data.points);
     }
+    if (data.allPoints) {
+      setAllPoints(data.allPoints);
+    } else {
+      setAllPoints(null);
+    }
 
     // Dynamic calculated overall rating
     const currentPerformance = Math.round((data.accuracy * 0.5 + data.confidence * 0.5) * 100);
     setOverallPerformance(currentPerformance);
 
-    // Auto complete session when airplane gets safely onto gate (y threshold)
-    if (data.y >= 80) {
-      handleComplete(Math.round(data.accuracy * 100));
+    // Update real-time exercise progress
+    if (isRunning) {
+      updateGestureProgress(data.gesture, data.confidence);
     }
   });
 
   // Start marshalling
   const handleStart = () => {
     setIsRunning(true);
+    lastProgressResetRef.current = Date.now(); // Không yêu cầu transition cho cự chỉ đầu tiên
+    needsGestureResetRef.current = false;
+    lastCompletedGestureRef.current = '';
+    matchingStartRef.current = null;
+    resetGapStartRef.current = null;
+    lastTargetRef.current = '';
     if (isConnected) {
       startSession(activeScenarioId);
     }
@@ -206,19 +320,21 @@ export default function Home() {
   const handleReset = () => {
     setIsRunning(false);
     setShowSuccessModal(false);
-    setAirplane({
-      x: 50,
-      y: 15,
-      angle: 0,
-      vx: 0,
-      vy: 0
-    });
     setDetectedGesture('Chưa bắt đầu');
     setAccuracy(0);
     setSpeed(0);
     setElapsedTime(0);
     setConfidence(0);
     setOverallPerformance(0);
+    setAllPoints(null);
+    setActiveGestureIndex(0);
+    setGestureHoldProgress(0);
+    lastProgressResetRef.current = Date.now(); // Reset transition timer
+    needsGestureResetRef.current = false;
+    lastCompletedGestureRef.current = '';
+    matchingStartRef.current = null;
+    resetGapStartRef.current = null;
+    lastTargetRef.current = '';
 
     if (isConnected) {
       resetSession();
@@ -264,71 +380,26 @@ export default function Home() {
       setElapsedTime(prev => {
         const nextTime = prev + 1;
         
-        // Define scenario gesture sequences based on elapsed time ticks
-        let expectedGesture = 'DI CHUYỂN THẲNG';
-        let isEmergency = activeScenario.expectedGestures.includes('DỪNG KHẨN CẤP');
+        // Lấy cử chỉ hiện tại yêu cầu của kịch bản
+        const currentTarget = activeScenario.expectedGestures[activeGestureIndex] || 'NONE';
+        setDetectedGesture(currentTarget);
 
-        if (isEmergency) {
-          expectedGesture = 'DỪNG KHẨN CẤP';
-        } else {
-          if (nextTime > 15) {
-            expectedGesture = 'DỪNG LẠI';
-          } else if (nextTime > 8) {
-            expectedGesture = 'GIẢM TỐC ĐỘ';
-          } else if (activeScenario.id === '3' && nextTime > 4) {
-            expectedGesture = nextTime % 2 === 0 ? 'RẼ TRÁI' : 'RẼ PHẢI';
-          }
-        }
-
-        setDetectedGesture(expectedGesture);
-
-        // Set telemetry indicators
-        const currentAccuracy = Math.min(98, Math.max(82, 90 + Math.sin(nextTime) * 8));
-        const currentConfidence = Math.min(96, Math.max(76, 85 + Math.cos(nextTime) * 6));
+        // Đặt chỉ số mô phỏng
+        const currentAccuracy = Math.min(98, Math.max(85, 92 + Math.sin(nextTime) * 4));
+        const currentConfidence = Math.min(96, Math.max(80, 88 + Math.cos(nextTime) * 5));
         setAccuracy(Math.round(currentAccuracy));
         setConfidence(Math.round(currentConfidence));
-        setSpeed(Math.round(18 + Math.sin(nextTime) * 3));
-        setOverallPerformance(Math.round(currentAccuracy * 0.6 + currentConfidence * 0.4));
+        setSpeed(Math.round(18 + Math.sin(nextTime) * 2));
+        setOverallPerformance(Math.round(currentAccuracy * 0.5 + currentConfidence * 0.5));
 
-        // Update Airplane X/Y coordinates drift
-        setAirplane(prevPlane => {
-          let nextY = prevPlane.y + 1.2; // plane travels downward
-          let nextX = prevPlane.x;
-          let angle = 0;
+        // Tích lũy tiến trình giữ cử chỉ (chạy offline sẽ mô phỏng khớp 35% mỗi giây để hoàn thành mượt mà)
+        updateGestureProgress(currentTarget, currentConfidence / 100);
 
-          if (expectedGesture === 'DỪNG LẠI') {
-            nextY = prevPlane.y; // stops moving
-          } else if (expectedGesture === 'RẼ TRÁI') {
-            nextX = Math.max(25, prevPlane.x - 0.7);
-            angle = -20;
-          } else if (expectedGesture === 'RẼ PHẢI') {
-            nextX = Math.min(75, prevPlane.x + 0.7);
-            angle = 20;
-          }
-
-          // Trigger completion on y bounds
-          if (nextY >= 80) {
-            clearInterval(interval);
-            setTimeout(() => {
-              handleComplete(Math.round(currentAccuracy));
-            }, 300);
-          }
-
-          return {
-            x: nextX,
-            y: nextY,
-            vx: expectedGesture === 'RẼ PHẢI' ? 0.7 : (expectedGesture === 'RẼ TRÁI' ? -0.7 : 0),
-            vy: expectedGesture === 'DỪNG LẠI' ? 0 : 1.2,
-            angle
-          };
-        });
-
-        // Simulating floating green skeletal joint coordinates based on gesture wave
+        // Giả lập vẽ bộ xương di chuyển theo cử chỉ để tạo hiệu ứng sinh động khi test offline
         setPoints(prevPoints => {
           const tick = Date.now() / 150;
           
-          if (expectedGesture === 'DI CHUYỂN THẲNG') {
-            // Wave hands vertically up and down in loops
+          if (currentTarget === 'AHEAD') {
             const waveY = Math.sin(tick) * 35;
             return {
               ...prevPoints,
@@ -337,16 +408,21 @@ export default function Home() {
               lWrist: { cx: 120 + Math.cos(tick) * 5, cy: 95 + waveY },
               rWrist: { cx: 280 + Math.sin(tick) * 5, cy: 95 + waveY }
             };
-          } else if (expectedGesture === 'GIẢM TỐC ĐỘ') {
-            // Slow hover hands below shoulder level
-            const slowY = 160 + Math.sin(tick) * 15;
+          } else if (currentTarget === 'LEFT') {
+            const shiftX = Math.sin(tick) * 30;
             return {
               ...prevPoints,
-              lWrist: { cx: 110, cy: slowY },
-              rWrist: { cx: 290, cy: slowY }
+              lWrist: { cx: 80 + shiftX, cy: 80 },
+              rWrist: { cx: 200, cy: 120 }
             };
-          } else if (expectedGesture === 'DỪNG KHẨN CẤP') {
-            // Rapidly cross arms overhead
+          } else if (currentTarget === 'RIGHT') {
+            const shiftX = Math.sin(tick) * 30;
+            return {
+              ...prevPoints,
+              lWrist: { cx: 320 + shiftX, cy: 80 },
+              rWrist: { cx: 200, cy: 120 }
+            };
+          } else if (currentTarget === 'STOP') {
             const shiftX = Math.sin(tick) * 20;
             return {
               ...prevPoints,
@@ -354,11 +430,11 @@ export default function Home() {
               rWrist: { cx: 220 + shiftX, cy: 55 }
             };
           } else {
-            // "DỪNG LẠI" - Raise arms in fixed standard shape above head
+            // NONE - tư thế bình thường
             return {
               ...prevPoints,
-              lWrist: { cx: 150, cy: 45 },
-              rWrist: { cx: 250, cy: 45 }
+              lWrist: { cx: 150, cy: 120 },
+              rWrist: { cx: 250, cy: 120 }
             };
           }
         });
@@ -368,7 +444,7 @@ export default function Home() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, activeScenario, isConnected]);
+  }, [isRunning, activeScenario, isConnected, activeGestureIndex]);
 
   // Formatter for seconds to mm:ss
   const formatTime = (seconds: number) => {
@@ -406,6 +482,11 @@ export default function Home() {
     return Math.round(sum / completedList.length);
   };
 
+  const handleModelChange = (model: 'dnn' | 'rf') => {
+    setSelectedModel(model);
+    window.location.reload(); // Refresh the page to avoid cache issues
+  };
+
   return (
     <div className={styles.pageContainer}>
       
@@ -439,7 +520,10 @@ export default function Home() {
               isRunning={isRunning}
               enableSkeleton={enableSkeleton}
               points={points}
-              onFrameCaptured={(base64) => sendVideoFrame(base64, selectedModel)}
+              allPoints={allPoints}
+              activeGestureIndex={activeGestureIndex}
+              gestureHoldProgress={gestureHoldProgress}
+              onFrameCaptured={(base64, frameId) => sendVideoFrame(base64, selectedModel, frameId)}
             />
 
             <ControlToolbar 
@@ -455,7 +539,7 @@ export default function Home() {
                 }
               }}
               selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
+              onModelChange={handleModelChange}
             />
           </div>
 
@@ -467,8 +551,6 @@ export default function Home() {
             elapsedTime={elapsedTime}
             confidence={confidence}
             overallPerformance={overallPerformance}
-            currentView={currentView}
-            onViewToggle={() => setCurrentView(prev => prev === 'sim' ? 'camera' : 'sim')}
             formatTime={formatTime}
           />
         </main>
@@ -500,6 +582,7 @@ export default function Home() {
         <ImageRecognitionView 
           socket={socket}
           isConnected={isConnected}
+          socketUrl={socketUrl}
         />
       )}
 

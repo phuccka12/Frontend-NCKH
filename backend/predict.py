@@ -42,8 +42,8 @@ def predict(frame, model, mode):
             idx = model.predict(features)[0]
             conf = np.max(model.predict_proba(features))
             
-        # Vẽ lên frame
-        mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+        # Loại bỏ vẽ khung xương - Frontend sẽ vẽ
+        # mp.solutions.drawing_utils.draw_landmarks(frame, res.pose_landmarks, mp_pose.POSE_CONNECTIONS)
         return LABELS[idx], conf, frame
     return None, 0, frame
 
