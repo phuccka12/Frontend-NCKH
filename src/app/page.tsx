@@ -14,6 +14,8 @@ import { DashboardView } from '@/components/DashboardView';
 import { SettingsView } from '@/components/SettingsView';
 import { SuccessModal } from '@/components/SuccessModal';
 import { ImageRecognitionView } from '@/components/ImageRecognitionView';
+import { AuthView } from '@/components/AuthView';
+import { HomeView } from '@/components/HomeView';
 
 interface Scenario {
   id: string;
@@ -25,63 +27,6 @@ interface Scenario {
   expectedGestures: string[];
 }
 
-const scenarios: Scenario[] = [
-  {
-    id: '1',
-    name: 'Hướng dẫn cơ bản',
-    description: 'Tìm hiểu các tín hiệu cơ bản của người điều hành mặt đất.',
-    difficulty: 'easy',
-    difficultyText: 'Cơ bản',
-    duration: '5 phút',
-    expectedGestures: ['AHEAD', 'STOP']
-  },
-  {
-    id: '2',
-    name: 'Hướng dẫn tiêu chuẩn',
-    description: 'Hướng dẫn máy bay di chuyển vào vạch đỗ an toàn chuẩn sân bay.',
-    difficulty: 'easy',
-    difficultyText: 'Cơ bản',
-    duration: '8 phút',
-    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'STOP']
-  },
-  {
-    id: '3',
-    name: 'Điều kiện gió mạnh',
-    description: 'Điều phối máy bay giữ thăng bằng trong điều kiện thời tiết xấu.',
-    difficulty: 'medium',
-    difficultyText: 'Trung bình',
-    duration: '10 phút',
-    expectedGestures: ['LEFT', 'AHEAD', 'RIGHT', 'AHEAD', 'LEFT', 'STOP']
-  },
-  {
-    id: '4',
-    name: 'Tình huống khẩn cấp',
-    description: 'Xử lý các tình huống nguy hiểm và phát tín hiệu dừng khẩn cấp.',
-    difficulty: 'medium',
-    difficultyText: 'Trung bình',
-    duration: '12 phút',
-    expectedGestures: ['AHEAD', 'STOP', 'STOP']
-  },
-  {
-    id: '5',
-    name: 'Hướng dẫn ban đêm',
-    description: 'Thực hành điều hành bay đêm bằng gậy phát sáng chuyên dụng.',
-    difficulty: 'hard',
-    difficultyText: 'Nâng cao',
-    duration: '15 phút',
-    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'AHEAD', 'STOP']
-  },
-  {
-    id: '6',
-    name: 'Máy bay lớn',
-    description: 'Điều phối các dòng máy bay Boeing/Airbus thân rộng, tải trọng cực lớn.',
-    difficulty: 'hard',
-    difficultyText: 'Nâng cao',
-    duration: '20 phút',
-    expectedGestures: ['AHEAD', 'LEFT', 'AHEAD', 'RIGHT', 'LEFT', 'STOP']
-  }
-];
-
 const gestureRules: Record<string, { minConfidence: number; holdMs: number }> = {
   AHEAD: { minConfidence: 0.35, holdMs: 2200 },
   LEFT: { minConfidence: 0.35, holdMs: 2600 },
@@ -92,12 +37,19 @@ const gestureRules: Record<string, { minConfidence: number; holdMs: number }> = 
 const gestureResetGapMs = 500;
 
 export default function Home() {
-  // Navigation State
-  const [activeTab, setActiveTab] = useState<'training' | 'dashboard' | 'settings' | 'upload'>('training');
+  // Auth State
+  const [user, setUser] = useState<{ id: string; username: string; full_name: string; token: string } | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // Scenario States
+  // Navigation State
+  const [activeTab, setActiveTab] = useState<'home' | 'training' | 'dashboard' | 'settings' | 'upload'>('home');
+
+  // Scenario & History States (Nạp động từ MongoDB Cloud Atlas)
   const [activeScenarioId, setActiveScenarioId] = useState<string>('1');
-  const [completedScenarios, setCompletedScenarios] = useState<string[]>(['1', '5']);
+  const [scenariosList, setScenariosList] = useState<Scenario[]>([]);
+  const [completedScenarios, setCompletedScenarios] = useState<string[]>([]);
+  const [scoresData, setScoresData] = useState<Record<string, number>>({});
+  const [historyList, setHistoryList] = useState<any[]>([]);
   
   // Custom user settings fields
   const [socketUrl, setSocketUrl] = useState(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:8000');
@@ -111,10 +63,110 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState<'dnn' | 'rf'>('dnn');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Khôi phục user từ localStorage khi mount
+  useEffect(() => {
+    const stored = localStorage.getItem('marshaller_user');
+    if (stored) {
+      try {
+        setUser(JSON.parse(stored));
+      } catch (e) {
+        localStorage.removeItem('marshaller_user');
+      }
+    }
+  }, []);
+
+  // Tải kịch bản động từ MongoDB Cloud
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchScenarios = async () => {
+      try {
+        const response = await fetch(`${socketUrl.replace(/\/$/, '')}/api/scenarios`);
+        if (response.ok) {
+          const data = await response.json();
+          const mappedData = data.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            description: s.description,
+            difficulty: s.difficulty,
+            difficultyText: s.difficulty_text || s.difficultyText,
+            duration: s.duration,
+            expectedGestures: s.expected_gestures || s.expectedGestures || []
+          }));
+          setScenariosList(mappedData);
+          if (mappedData.length > 0) {
+            setActiveScenarioId(mappedData[0].id);
+          }
+        }
+      } catch (e) {
+        console.error("Lỗi tải kịch bản động:", e);
+      }
+    };
+    
+    fetchScenarios();
+  }, [user, socketUrl]);
+
+  // Tải lịch sử học tập động từ MongoDB Cloud
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch(`${socketUrl.replace(/\/$/, '')}/api/history`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        if (response.ok) {
+          const historyData = await response.json();
+          setHistoryList(historyData); // Lưu mảng lịch sử động
+          
+          // Cập nhật các kịch bản hoàn thành
+          const completed = Array.from(new Set(historyData.map((h: any) => h.scenario_id)));
+          setCompletedScenarios(completed as string[]);
+          
+          // Tính toán scoresData: lấy điểm số cao nhất cho mỗi kịch bản
+          const scores: Record<string, number> = {};
+          historyData.forEach((h: any) => {
+            scores[h.scenario_id] = Math.max(scores[h.scenario_id] || 0, h.score);
+          });
+          setScoresData(scores);
+        }
+      } catch (e) {
+        console.error("Lỗi tải lịch sử học tập động:", e);
+      }
+    };
+    
+    fetchHistory();
+  }, [user, socketUrl, activeTab]);
+
+  // Tính tổng thời gian học tập tích lũy động
+  const studyTimeText = useMemo(() => {
+    const totalSeconds = historyList.reduce((acc, curr) => acc + (curr.elapsed_time || 0), 0);
+    if (totalSeconds === 0) return "0 phút";
+    if (totalSeconds < 60) return `${totalSeconds} giây`;
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    if (mins >= 60) {
+      const hrs = Math.floor(mins / 60);
+      const remMins = mins % 60;
+      return `${hrs}h ${remMins}m`;
+    }
+    return `${mins} phút ${secs > 0 ? `${secs}s` : ''}`;
+  }, [historyList]);
+
   // Active Scenario computed object
   const activeScenario = useMemo(() => {
-    return scenarios.find(s => s.id === activeScenarioId) || scenarios[0];
-  }, [activeScenarioId]);
+    return scenariosList.find(s => s.id === activeScenarioId) || scenariosList[0] || {
+      id: '1',
+      name: 'Đang tải...',
+      description: 'Đang kết nối tới MongoDB Cloud Atlas...',
+      difficulty: 'easy',
+      difficultyText: 'Đang tải',
+      duration: '0 phút',
+      expectedGestures: []
+    };
+  }, [activeScenarioId, scenariosList]);
 
   // Telemetry metric states (live updates)
   const [airplane, setAirplane] = useState({
@@ -132,15 +184,7 @@ export default function Home() {
   const [confidence, setConfidence] = useState<number>(0);
   const [overallPerformance, setOverallPerformance] = useState<number>(0);
 
-  // Recharts Chart database state
-  const [scoresData, setScoresData] = useState<Record<string, number>>({
-    '1': 92,
-    '2': 88,
-    '3': 0,
-    '4': 0,
-    '5': 85,
-    '6': 0
-  });
+
 
   // Skeletal simulation joints points refs
   const [points, setPoints] = useState({
@@ -160,6 +204,7 @@ export default function Home() {
   // Training dynamic progress tracking
   const [activeGestureIndex, setActiveGestureIndex] = useState<number>(0);
   const [gestureHoldProgress, setGestureHoldProgress] = useState<number>(0);
+  const [sessionDetails, setSessionDetails] = useState<Array<{ gesture_name: string; sequence_index: number; score: number; elapsed_time: number; completed: boolean }>>([]);
   const [lastDetectedGesture, setLastDetectedGesture] = useState<string>('NONE');
   const lastProgressResetRef = useRef<number>(0);
   const needsGestureResetRef = useRef<boolean>(false);
@@ -168,16 +213,106 @@ export default function Home() {
   const resetGapStartRef = useRef<number | null>(null);
   const lastTargetRef = useRef<string>('');
 
+  // Refs to avoid stale closures in event loops & intervals
+  const activeGestureIndexRef = useRef(activeGestureIndex);
+  const activeScenarioRef = useRef(activeScenario);
+  const sessionDetailsRef = useRef(sessionDetails);
+
+  useEffect(() => {
+    activeGestureIndexRef.current = activeGestureIndex;
+  }, [activeGestureIndex]);
+
+  useEffect(() => {
+    activeScenarioRef.current = activeScenario;
+  }, [activeScenario]);
+
+  useEffect(() => {
+    sessionDetailsRef.current = sessionDetails;
+  }, [sessionDetails]);
+
+  const saveHistoryToBackend = async (score: number, elapsed: number, details?: any[]) => {
+    if (!user) return;
+    try {
+      const response = await fetch(`${socketUrl.replace(/\/$/, '')}/api/history`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user.token}`
+        },
+        body: JSON.stringify({
+          scenario_id: activeScenarioId,
+          score: score,
+          elapsed_time: elapsed,
+          completed: true
+        })
+      });
+
+      if (response.ok) {
+        const historyRecord = await response.json();
+        console.log("Đã lưu tiến trình học tập lên MongoDB Cloud!");
+        const historyId = historyRecord.id;
+
+        // Lưu chi tiết từng cử chỉ (Detail_Evaluations) nếu có
+        if (details && details.length > 0) {
+          try {
+            const detailsResponse = await fetch(`${socketUrl.replace(/\/$/, '')}/api/history/${historyId}/details`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${user.token}`
+              },
+              body: JSON.stringify(details)
+            });
+            if (detailsResponse.ok) {
+              console.log("Đã lưu kết quả chi tiết từng động tác lên MongoDB Cloud!");
+            } else {
+              console.error("Lỗi khi lưu kết quả chi tiết:", await detailsResponse.text());
+            }
+          } catch (err) {
+            console.error("Lỗi mạng khi lưu kết quả chi tiết:", err);
+          }
+        }
+
+        // Tải lại lịch sử học tập động từ MongoDB Cloud
+        const historyResponse = await fetch(`${socketUrl.replace(/\/$/, '')}/api/history`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`
+          }
+        });
+        if (historyResponse.ok) {
+          const historyData = await historyResponse.json();
+          setHistoryList(historyData);
+          
+          const completed = Array.from(new Set(historyData.map((h: any) => h.scenario_id)));
+          setCompletedScenarios(completed as string[]);
+          
+          const scores: Record<string, number> = {};
+          historyData.forEach((h: any) => {
+            scores[h.scenario_id] = Math.max(scores[h.scenario_id] || 0, h.score);
+          });
+          setScoresData(scores);
+        }
+      } else {
+        console.error("Lỗi khi lưu tiến trình học tập:", await response.text());
+      }
+    } catch (e) {
+      console.error("Lỗi mạng khi lưu tiến trình:", e);
+    }
+  };
+
   const updateGestureProgress = (detected: string, confidenceVal: number) => {
     // Cập nhật lần phát hiện cuối cùng
     setLastDetectedGesture(detected);
     
-    const targetGesture = activeScenario.expectedGestures[activeGestureIndex];
+    const currentScenario = activeScenarioRef.current;
+    const currentIndex = activeGestureIndexRef.current;
+    
+    const targetGesture = (currentScenario?.expectedGestures || [])[currentIndex];
     if (!targetGesture) return;
 
     const isMatching = detected.trim().toUpperCase() === targetGesture.trim().toUpperCase();
 
-    console.log('isMatching:', isMatching, 'confidenceVal:', confidenceVal, 'activeGestureIndex:', activeGestureIndex, 'expectedGestures:', activeScenario.expectedGestures);
+    console.log('isMatching:', isMatching, 'confidenceVal:', confidenceVal, 'activeGestureIndex:', currentIndex, 'expectedGestures:', currentScenario?.expectedGestures);
     console.log('showSuccessModal:', showSuccessModal);
 
     const detectedUpper = detected.trim().toUpperCase();
@@ -229,8 +364,22 @@ export default function Home() {
         matchingStartRef.current = null;
         setGestureHoldProgress(0);
 
+        const currentGestureScore = Math.round(confidenceVal * 100);
+        const currentGestureTime = Math.max(1, Math.round(elapsed / 1000));
+        const detailRecord = {
+          gesture_name: targetGesture,
+          sequence_index: currentIndex,
+          score: currentGestureScore,
+          elapsed_time: currentGestureTime,
+          completed: true
+        };
+
+        const updatedDetails = [...sessionDetailsRef.current, detailRecord];
+        setSessionDetails(updatedDetails);
+        sessionDetailsRef.current = updatedDetails;
+
         // Hoàn thành cử chỉ hiện tại
-        if (activeGestureIndex + 1 >= activeScenario.expectedGestures.length) {
+        if (currentIndex + 1 >= (currentScenario?.expectedGestures || []).length) {
           // Hoàn thành toàn bộ kịch bản huấn luyện!
           setIsRunning(false);
           setShowSuccessModal(true);
@@ -245,6 +394,7 @@ export default function Home() {
             ...prevScores,
             [activeScenarioId]: Math.max(prevScores[activeScenarioId] || 0, finalAccuracy)
           }));
+          saveHistoryToBackend(finalAccuracy, elapsedTime, updatedDetails);
         } else {
           setActiveGestureIndex(idx => idx + 1);
         }
@@ -297,6 +447,7 @@ export default function Home() {
   // Start marshalling
   const handleStart = () => {
     setIsRunning(true);
+    setSessionDetails([]);
     lastProgressResetRef.current = Date.now(); // Không yêu cầu transition cho cự chỉ đầu tiên
     needsGestureResetRef.current = false;
     lastCompletedGestureRef.current = '';
@@ -329,6 +480,7 @@ export default function Home() {
     setAllPoints(null);
     setActiveGestureIndex(0);
     setGestureHoldProgress(0);
+    setSessionDetails([]);
     lastProgressResetRef.current = Date.now(); // Reset transition timer
     needsGestureResetRef.current = false;
     lastCompletedGestureRef.current = '';
@@ -370,6 +522,18 @@ export default function Home() {
       ...prev,
       [activeScenarioId]: Math.max(prev[activeScenarioId] || 0, finalAccuracy)
     }));
+
+    // Tạo danh sách đánh giá vi mô mặc định cho kịch bản hoàn thành
+    const defaultDetails = (activeScenario?.expectedGestures || []).map((gesture, idx) => ({
+      gesture_name: gesture,
+      sequence_index: idx,
+      score: finalAccuracy,
+      elapsed_time: 3, // mặc định 3 giây giữ cử chỉ
+      completed: true
+    }));
+
+    setSessionDetails(defaultDetails);
+    saveHistoryToBackend(finalAccuracy, elapsedTime, defaultDetails);
   };
 
   // Offline Simulation engine loops
@@ -381,7 +545,7 @@ export default function Home() {
         const nextTime = prev + 1;
         
         // Lấy cử chỉ hiện tại yêu cầu của kịch bản
-        const currentTarget = activeScenario.expectedGestures[activeGestureIndex] || 'NONE';
+        const currentTarget = (activeScenarioRef.current?.expectedGestures || [])[activeGestureIndexRef.current] || 'NONE';
         setDetectedGesture(currentTarget);
 
         // Đặt chỉ số mô phỏng
@@ -455,25 +619,28 @@ export default function Home() {
 
   // Recharts scenario score computations
   const scenarioChartData = useMemo(() => {
-    return scenarios.map(s => ({
+    return scenariosList.map(s => ({
       name: s.id === '1' ? 'Cơ bản 1' : (s.id === '2' ? 'Cơ bản 2' : s.name),
       score: scoresData[s.id] || 0,
       amt: 100
     }));
-  }, [scoresData]);
+  }, [scoresData, scenariosList]);
 
   // Calculate difficulty distribution for PieChart
   const difficultyDistribution = useMemo(() => {
     const counts = { easy: 0, medium: 0, hard: 0 };
-    scenarios.forEach(s => {
-      counts[s.difficulty]++;
+    scenariosList.forEach(s => {
+      const diff = s.difficulty as 'easy' | 'medium' | 'hard';
+      if (counts[diff] !== undefined) {
+        counts[diff]++;
+      }
     });
     return [
       { name: 'Cơ bản', value: counts.easy, color: '#1e3a8a' }, // Deep/navy blue segment
       { name: 'Trung bình', value: counts.medium, color: '#3b82f6' }, // Light blue
       { name: 'Nâng cao', value: counts.hard, color: '#60a5fa' } // Sky blue
     ];
-  }, []);
+  }, [scenariosList]);
 
   const getOverallAccuracyAvg = () => {
     const completedList = Object.values(scoresData).filter(score => score > 0);
@@ -487,24 +654,56 @@ export default function Home() {
     window.location.reload(); // Refresh the page to avoid cache issues
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('marshaller_user');
+    handleReset();
+  };
+
+
+
   return (
     <div className={styles.pageContainer}>
       
       {/* 1. Brand Header */}
       <Header 
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={(tab) => {
+          if (tab !== 'home' && !user) {
+            setShowAuthModal(true);
+          } else {
+            setActiveTab(tab);
+          }
+        }}
         isConnected={isConnected}
         isConnecting={isConnecting}
+        user={user}
+        onLogout={handleLogout}
+        onOpenAuth={() => setShowAuthModal(true)}
       />
 
       {/* 2. Main Page Renderings depending on active tab */}
+      {activeTab === 'home' && (
+        <HomeView 
+          completedScenariosCount={user ? completedScenarios.length : 0}
+          overallAccuracyAvg={user ? getOverallAccuracyAvg() : 0}
+          studyTimeText={user ? studyTimeText : "0 phút"}
+          onNavigate={(tab) => {
+            if (tab !== 'home' && !user) {
+              setShowAuthModal(true);
+            } else {
+              setActiveTab(tab);
+            }
+          }}
+        />
+      )}
+
       {activeTab === 'training' && (
         <main className={styles.workspace}>
           
           {/* Left: Scenarios Selector panel */}
           <ScenarioSelector 
-            scenarios={scenarios}
+            scenarios={scenariosList}
             activeScenarioId={activeScenarioId}
             completedScenarios={completedScenarios}
             onScenarioChange={handleScenarioChange}
@@ -563,6 +762,10 @@ export default function Home() {
           difficultyDistribution={difficultyDistribution}
           scenarioChartData={scenarioChartData}
           getOverallAccuracyAvg={getOverallAccuracyAvg}
+          studyTimeText={studyTimeText}
+          historyList={historyList}
+          socketUrl={socketUrl}
+          user={user}
         />
       )}
 
@@ -598,6 +801,20 @@ export default function Home() {
             setShowSuccessModal(false);
             setActiveTab('dashboard');
           }}
+          details={sessionDetails}
+        />
+      )}
+
+      {/* 4. Cyberpunk Authentication Overlay Modal */}
+      {showAuthModal && (
+        <AuthView 
+          socketUrl={socketUrl}
+          onAuthSuccess={(userData) => {
+            setUser(userData);
+            localStorage.setItem('marshaller_user', JSON.stringify(userData));
+            setShowAuthModal(false);
+          }}
+          onClose={() => setShowAuthModal(false)}
         />
       )}
     </div>

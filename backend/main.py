@@ -13,11 +13,35 @@ from tensorflow.keras.models import load_model
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
+import jwt
+from typing import List
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Security
+import database
+from database import db
+import crud
+import schemas
+from bson import ObjectId
 
 load_dotenv()
 
 # --- CẤU HÌNH BẢO MẬT ---
 AI_SECRET_KEY = os.getenv("AI_SECRET_KEY", "sk_ai_7Xq9Lm2PzR8vNc4KbY1DfH6TwS3JuE5")
+JWT_SECRET = "jwt_secret_marshaller_ai_9Xz1Pr7Km3Yn6Bq4Lv2Wj"
+
+# Dependency để lấy user_id từ JWT token
+security = HTTPBearer()
+
+def get_current_user_id(credentials: HTTPAuthorizationCredentials = Security(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user_id
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token or expired session")
 
 # --- LOAD MODELS ---
 CLASSES_PATH = os.path.join('models', 'classes.npy')
@@ -61,6 +85,238 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- KHỞI TẠO HẠT GIỐNG DỮ LIỆU MONGODB (DATA SEEDING) ---
+scenarios_seed = [
+    {
+        "id": "1",
+        "name": "Hướng dẫn cơ bản",
+        "description": "Tìm hiểu các tín hiệu cơ bản của người điều hành mặt đất.",
+        "difficulty": "easy",
+        "difficulty_text": "Cơ bản",
+        "duration": "5 phút",
+        "expected_gestures": ["AHEAD", "STOP"]
+    },
+    {
+        "id": "2",
+        "name": "Hướng dẫn tiêu chuẩn",
+        "description": "Hướng dẫn máy bay di chuyển vào vạch đỗ an toàn chuẩn sân bay.",
+        "difficulty": "easy",
+        "difficulty_text": "Cơ bản",
+        "duration": "8 phút",
+        "expected_gestures": ["AHEAD", "LEFT", "AHEAD", "RIGHT", "STOP"]
+    },
+    {
+        "id": "3",
+        "name": "Điều kiện gió mạnh",
+        "description": "Điều phối máy bay giữ thăng bằng trong điều kiện thời tiết xấu.",
+        "difficulty": "medium",
+        "difficulty_text": "Trung bình",
+        "duration": "10 phút",
+        "expected_gestures": ["LEFT", "AHEAD", "RIGHT", "AHEAD", "LEFT", "STOP"]
+    },
+    {
+        "id": "4",
+        "name": "Tình huống khẩn cấp",
+        "description": "Xử lý các tình huống nguy hiểm và phát tín hiệu dừng khẩn cấp.",
+        "difficulty": "medium",
+        "difficulty_text": "Trung bình",
+        "duration": "12 phút",
+        "expected_gestures": ["AHEAD", "STOP", "STOP"]
+    },
+    {
+        "id": "5",
+        "name": "Hướng dẫn ban đêm",
+        "description": "Thực hành điều hành bay đêm bằng gậy phát sáng chuyên dụng.",
+        "difficulty": "hard",
+        "difficulty_text": "Nâng cao",
+        "duration": "15 phút",
+        "expected_gestures": ["AHEAD", "LEFT", "AHEAD", "RIGHT", "AHEAD", "STOP"]
+    },
+    {
+        "id": "6",
+        "name": "Máy bay lớn",
+        "description": "Điều phối các dòng máy bay Boeing/Airbus thân rộng, tải trọng cực lớn.",
+        "difficulty": "hard",
+        "difficulty_text": "Nâng cao",
+        "duration": "20 phút",
+        "expected_gestures": ["AHEAD", "LEFT", "AHEAD", "RIGHT", "LEFT", "STOP"]
+    }
+]
+
+@app.on_event("startup")
+async def startup_event():
+    # Ping database
+    connected = await database.ping_database()
+    if not connected:
+        print("MongoDB Cloud Atlas is offline! Seeding skipped.")
+        return
+        
+    # Seed Scenarios
+    existing_scenarios = await crud.get_scenarios()
+    if not existing_scenarios:
+        print("Seeding scenarios to MongoDB Cloud Atlas...")
+        for sc in scenarios_seed:
+            await crud.create_scenario(sc)
+        print("Scenarios seeded successfully.")
+        
+    # Seed guest account guest / guest
+    existing_guest = await crud.get_user_by_username("guest")
+    if not existing_guest:
+        print("Seeding guest account guest/guest to MongoDB Cloud Atlas...")
+        await crud.create_user("guest", "guest", "Học viên Khách")
+        print("Guest account seeded successfully.")
+
+# --- ROUTES AUTHENTICATION ---
+@app.post("/api/auth/register", response_model=schemas.UserResponse)
+async def register(user_in: schemas.UserRegister):
+    existing = await crud.get_user_by_username(user_in.username)
+    if existing:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    user = await crud.create_user(user_in.username, user_in.password, user_in.full_name, user_in.email)
+    return {
+        "id": str(user["_id"]),
+        "username": user["username"],
+        "full_name": user["full_name"],
+        "email": user.get("email", ""),
+        "role": user["role"],
+        "created_at": user["created_at"]
+    }
+
+@app.post("/api/auth/login", response_model=schemas.TokenResponse)
+async def login(credentials: schemas.UserLogin):
+    user = await crud.get_user_by_username(credentials.username)
+    if not user or not crud.verify_password(credentials.password, user["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+        
+    token = jwt.encode({"user_id": str(user["_id"])}, JWT_SECRET, algorithm="HS256")
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(user["_id"]),
+            "username": user["username"],
+            "full_name": user["full_name"],
+            "email": user.get("email", ""),
+            "role": user["role"],
+            "created_at": user["created_at"]
+        }
+    }
+
+# --- ROUTES SCENARIOS ---
+@app.get("/api/scenarios", response_model=List[schemas.ScenarioResponse])
+async def get_scenarios_api():
+    scs = await crud.get_scenarios()
+    return [{**sc, "id": sc["_id"]} for sc in scs]
+
+# --- ROUTES TRAINING HISTORY ---
+@app.post("/api/history", response_model=schemas.TrainingHistoryResponse)
+async def save_history_api(data: schemas.TrainingHistoryCreate, user_id: str = Depends(get_current_user_id)):
+    history = await crud.save_history(
+        user_id=user_id,
+        scenario_id=data.scenario_id,
+        score=data.score,
+        elapsed_time=data.elapsed_time,
+        completed=data.completed
+    )
+    return {
+        "id": str(history["_id"]),
+        "user_id": str(history["user_id"]),
+        "scenario_id": history["scenario_id"],
+        "score": history["score"],
+        "elapsed_time": history["elapsed_time"],
+        "completed": history["completed"],
+        "created_at": history["created_at"]
+    }
+
+@app.get("/api/history", response_model=List[schemas.TrainingHistoryResponse])
+async def get_history_api(user_id: str = Depends(get_current_user_id)):
+    histories = await crud.get_user_history(user_id)
+    return [{
+        "id": str(h["_id"]),
+        "user_id": str(h["user_id"]),
+        "scenario_id": h["scenario_id"],
+        "score": h["score"],
+        "elapsed_time": h["elapsed_time"],
+        "completed": h["completed"],
+        "created_at": h["created_at"]
+    } for h in histories]
+
+@app.post("/api/history/{history_id}/details", response_model=List[schemas.DetailEvaluationResponse])
+async def save_history_details_api(
+    history_id: str,
+    details: List[schemas.DetailEvaluationCreate],
+    user_id: str = Depends(get_current_user_id)
+):
+    history = await db.training_history.find_one({"_id": ObjectId(history_id)})
+    if not history:
+        raise HTTPException(status_code=404, detail="Training history record not found")
+    
+    saved_details = []
+    for d in details:
+        saved = await crud.save_detail_evaluation(
+            history_id=history_id,
+            user_id=user_id,
+            scenario_id=history["scenario_id"],
+            gesture_name=d.gesture_name,
+            sequence_index=d.sequence_index,
+            score=d.score,
+            elapsed_time=d.elapsed_time,
+            completed=d.completed
+        )
+        saved_details.append({
+            "id": str(saved["_id"]),
+            "history_id": str(saved["history_id"]),
+            "user_id": str(saved["user_id"]),
+            "scenario_id": saved["scenario_id"],
+            "gesture_name": saved["gesture_name"],
+            "sequence_index": saved["sequence_index"],
+            "score": saved["score"],
+            "elapsed_time": saved["elapsed_time"],
+            "completed": saved["completed"],
+            "created_at": saved["created_at"]
+        })
+    return saved_details
+
+@app.get("/api/history/{history_id}/details", response_model=List[schemas.DetailEvaluationResponse])
+async def get_history_details_api(history_id: str, user_id: str = Depends(get_current_user_id)):
+    details = await crud.get_detail_evaluations_by_history(history_id)
+    return [{
+        "id": str(d["_id"]),
+        "history_id": str(d["history_id"]),
+        "user_id": str(d["user_id"]),
+        "scenario_id": d["scenario_id"],
+        "gesture_name": d["gesture_name"],
+        "sequence_index": d["sequence_index"],
+        "score": d["score"],
+        "elapsed_time": d["elapsed_time"],
+        "completed": d["completed"],
+        "created_at": d["created_at"]
+    } for d in details]
+
+# --- ROUTES USER SETTINGS ---
+@app.get("/api/settings", response_model=schemas.UserSettingsResponse)
+async def get_settings_api(user_id: str = Depends(get_current_user_id)):
+    settings = await crud.get_user_settings(user_id)
+    return {
+        "user_id": str(settings["user_id"]),
+        "sensitivity": settings["sensitivity"],
+        "selected_model": settings["selected_model"],
+        "enable_skeleton": settings["enable_skeleton"],
+        "socket_url": settings["socket_url"]
+    }
+
+@app.put("/api/settings", response_model=schemas.UserSettingsResponse)
+async def update_settings_api(data: schemas.UserSettingsUpdate, user_id: str = Depends(get_current_user_id)):
+    settings = await crud.update_user_settings(user_id, data.dict())
+    return {
+        "user_id": str(settings["user_id"]),
+        "sensitivity": settings["sensitivity"],
+        "selected_model": settings["selected_model"],
+        "enable_skeleton": settings["enable_skeleton"],
+        "socket_url": settings["socket_url"]
+    }
 
 # --- LOGIC XỬ LÝ AI (Hàm đồng bộ thuần túy) ---
 def normalize_upper_body_features(features_2d: np.ndarray) -> np.ndarray:

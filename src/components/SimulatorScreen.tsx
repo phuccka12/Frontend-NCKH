@@ -198,7 +198,7 @@ export const SimulatorScreen: React.FC<SimulatorScreenProps> = ({
           <div className={styles.taskHudContainer}>
             <span className={styles.taskHudTitle}>BÀI TẬP: THỰC HÀNH TÍN HIỆU GIAO TIẾP</span>
             <div className={styles.taskBadgeList}>
-              {activeScenario.expectedGestures.map((gesture, idx) => {
+              {(activeScenario?.expectedGestures || []).map((gesture, idx) => {
                 let badgeStatus = 'upcoming'; // 'completed' | 'active' | 'upcoming'
                 if (idx < activeGestureIndex) badgeStatus = 'completed';
                 else if (idx === activeGestureIndex) badgeStatus = 'active';
@@ -222,7 +222,7 @@ export const SimulatorScreen: React.FC<SimulatorScreenProps> = ({
             </div>
 
             {/* Hold Progress Bar */}
-            {isRunning && activeScenario.expectedGestures[activeGestureIndex] && (
+            {isRunning && activeScenario?.expectedGestures?.[activeGestureIndex] && (
               <div className={styles.holdProgressWrapper}>
                 <div className={styles.holdProgressTextRow}>
                   <span className={styles.holdProgressLabel}>
