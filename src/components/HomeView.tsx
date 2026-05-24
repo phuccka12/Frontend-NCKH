@@ -22,64 +22,68 @@ export const HomeView: React.FC<HomeViewProps> = ({
   const gestureDetails = {
     AHEAD: {
       key: "AHEAD",
+      name: "Đi thẳng",
       title: "Di chuyển thẳng phía trước",
-      description: "Dẫn hướng cho máy bay di chuyển thẳng dọc theo vạch dừng an toàn.",
+      description: "Dẫn hướng máy bay di chuyển thẳng dọc theo vạch an toàn.",
       standard: "2.2 giây",
       confidence: "35%",
       instructions: [
-        "Giơ cả hai cánh tay lên cao, lòng bàn tay hướng về phía sau.",
-        "Gập cánh tay từ khuỷu tay lên xuống liên tục.",
-        "Duy trì tốc độ ổn định cho đến khi máy bay đến vị trí cần thiết."
+        "Giơ hai tay lên cao, lòng bàn tay hướng về phía sau.",
+        "Gập tay từ khuỷu tay lên xuống liên tục.",
+        "Duy trì tốc độ ổn định đến khi máy bay vào vị trí."
       ],
       color: "#0047AB",
       bgLight: "rgba(0, 71, 171, 0.03)",
-      hologramPath: "/hologram4.png"
+      hologramPath: "/ahead.png"
     },
     LEFT: {
       key: "LEFT",
-      title: "Rẽ về bên trái của bạn",
-      description: "Dẫn hướng máy bay chuyển làn sang trái bằng cách làm cột mốc bên phải và vẫy tay trái.",
+      name: "Rẽ trái",
+      title: "Rẽ về bên trái (của người dẫn đường)",
+      description: "Hướng dẫn máy bay rẽ trái bằng cách giữ cố định tay phải và vẫy tay trái.",
       standard: "2.6 giây",
       confidence: "35%",
       instructions: [
-        "Giương cánh tay phải thẳng đứng trên đầu làm mốc cố định.",
-        "Cánh tay trái đưa ngang vai và gập nhịp nhàng về phía mũi.",
-        "Giữ thăng bằng và tốc độ vẫy đều đặn."
+        "Giơ tay phải thẳng đứng trên đầu làm mốc cố định.",
+        "Đưa tay trái ngang vai và gập nhịp nhàng về phía mũi.",
+        "Duy trì tốc độ vẫy đều đặn."
       ],
       color: "#0047AB",
       bgLight: "rgba(0, 71, 171, 0.03)",
-      hologramPath: "/hologram2.png"
+      hologramPath: "/left.png"
     },
     RIGHT: {
       key: "RIGHT",
-      title: "Rẽ về bên phải của bạn",
-      description: "Dẫn hướng máy bay chuyển làn sang phải bằng cách làm cột mốc bên trái và vẫy tay phải.",
+      name: "Rẽ phải",
+      title: "Rẽ về bên phải (của người dẫn đường)",
+      description: "Hướng dẫn máy bay rẽ phải bằng cách giữ cố định tay trái và vẫy tay phải.",
       standard: "2.6 giây",
       confidence: "35%",
       instructions: [
-        "Giương cánh tay trái thẳng đứng trên đầu làm mốc cố định.",
-        "Cánh tay phải đưa ngang vai và gập nhịp nhàng về phía mũi.",
-        "Duy trì tốc độ vẫy đồng bộ để hướng phi công đúng vạch."
+        "Giơ tay trái thẳng đứng trên đầu làm mốc cố định.",
+        "Đưa tay phải ngang vai và gập nhịp nhàng về phía mũi.",
+        "Duy trì tốc độ vẫy đều đặn."
       ],
       color: "#0047AB",
       bgLight: "rgba(0, 71, 171, 0.03)",
-      hologramPath: "/hologram.png"
+      hologramPath: "/right.png"
     },
     STOP: {
       key: "STOP",
-      title: "Dừng khẩn cấp (Emergency Stop)",
-      description: "Bắt buộc phi công phanh máy bay đứng yên tại chỗ lập tức.",
+      name: "Dừng bình thường",
+      title: "Dừng máy bay thông thường",
+      description: "Hiệu lệnh yêu cầu phi công giảm tốc và dừng máy bay tại vạch dừng.",
       standard: "1.8 giây",
       confidence: "40%",
       instructions: [
-        "Bắt chéo hai cánh tay thẳng đứng qua đầu tạo hình chữ X.",
-        "Đứng thẳng và giữ hoàn toàn yên lặng không được chuyển động.",
-        "Đảm bảo phi công nhìn thấy rõ hiệu lệnh để phanh gấp."
+        "Dang rộng hai tay sang hai bên một góc 180° (ngang vai).",
+        "Từ từ đưa hai tay lên phía trên đầu cho đến khi bắt chéo nhau.",
+        "Giữ nguyên tư thế bắt chéo cho đến khi máy bay dừng hẳn."
       ],
       color: "#ef4444",
       bgLight: "rgba(239, 68, 68, 0.03)",
-      hologramPath: "/hologram2.png"
-    }
+      hologramPath: "/stop.png"
+    },
   };
 
   return (
@@ -120,7 +124,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
             color: '#93c5fd',
             marginBottom: '20px'
           }}>
-            ✈️ AVIATION STANDARDS COMPLIANT
+            TUÂN THỦ TIÊU CHUẨN HÀNG KHÔNG
           </div>
 
           <h2 style={{
@@ -220,18 +224,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
             <strong style={{ color: '#ffffff', display: 'block', fontSize: '0.95rem' }}>DNN + MP</strong>
             <span>Phân tích thời gian thực</span>
           </div>
-          <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', height: '24px', alignSelf: 'center' }} />
-          <div style={{
-            background: 'rgba(0, 0, 0, 0.4)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
-            padding: '6px 14px',
-            borderRadius: '4px',
-            fontFamily: 'monospace',
-            letterSpacing: '0.05em',
-            color: '#60a5fa'
-          }}>
-            TRAINING MODULE: MARSHALLING // SKELETON TRACKING // MEDIAPIPE
-          </div>
         </div>
       </div>
 
@@ -287,7 +279,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           {/* Left Column - List Stack (30%) */}
           <div style={{ flex: '1 1 280px', maxWidth: '360px' }}>
             <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', margin: '0 0 10px 0' }}>
-              Thư Viện Cử Chỉ<br />(Aviation Rules)
+              Thư Viện Cử Chỉ
             </h3>
             <p style={{ fontSize: '0.84rem', color: '#64748b', margin: '0 0 24px 0', lineHeight: 1.5 }}>
               Chọn một cử chỉ để xem hướng dẫn thực hiện và yêu cầu kỹ thuật AI chuẩn xác.
@@ -295,8 +287,9 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {Object.keys(gestureDetails).map((key) => {
+                const item = gestureDetails[key as 'AHEAD' | 'LEFT' | 'RIGHT' | 'STOP'];
                 const isActive = activeGestureTab === key;
-                const gesture = gestureDetails[key as 'AHEAD' | 'LEFT' | 'RIGHT' | 'STOP'];
+
                 return (
                   <button
                     key={key}
@@ -314,10 +307,11 @@ export const HomeView: React.FC<HomeViewProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       transition: 'all 0.2s ease',
-                      textAlign: 'left'
+                      textAlign: 'left',
+                      width: '100%' // Thêm width 100% nếu bạn muốn các nút bấm đều nhau
                     }}
                   >
-                    <span>Cử chỉ {key}</span>
+                    <span>Cử chỉ {item.name}</span>
                     <ChevronRight size={16} />
                   </button>
                 );
@@ -332,7 +326,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
               {/* Left Detail content */}
               <div style={{ flex: '1 1 300px', zIndex: 2 }}>
                 <span style={{ display: 'inline-block', background: '#dbeafe', border: '1px solid #bfdbfe', color: '#1e40af', padding: '4px 10px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.02em', marginBottom: '14px' }}>
-                  Active training: {gestureDetails[activeGestureTab].key}
+                  Hướng dẫn: {gestureDetails[activeGestureTab].name}
                 </span>
 
                 <h4 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '0 0 16px 0' }}>
@@ -353,7 +347,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <span style={{ fontSize: '0.78rem', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.02em', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
-                    📖 Các bước thực hiện:
+                    Các bước thực hiện:
                   </span>
                   {gestureDetails[activeGestureTab].instructions.map((inst, index) => (
                     <div key={index} style={{ display: 'flex', gap: '10px', fontSize: '0.84rem', color: '#475569', lineHeight: 1.5 }}>
@@ -364,7 +358,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
                 </div>
               </div>
 
-              {/* Right Blueprint Hologram Graphic */}
               <div
                 style={{
                   flex: '1 1 200px',
@@ -386,15 +379,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'cover',
+                    objectFit: 'fill',
                     opacity: 0.95
                   }}
                 />
-                {/* Visual HUD overlay */}
-                <div style={{ position: 'absolute', bottom: '12px', right: '12px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', border: '1px solid rgba(0,229,255,0.3)' }}>
-                  <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00e5ff', display: 'inline-block', animation: 'scan-loop 1.5s infinite' }} />
-                  <span style={{ color: '#00e5ff', fontSize: '0.62rem', fontWeight: 700, fontFamily: 'monospace' }}>HUD FEED</span>
-                </div>
               </div>
 
             </div>
@@ -486,65 +474,6 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
         </div>
       </section>
-
-      {/* 5. Widescreen Footer Section */}
-      <footer style={{ background: '#1e293b', padding: '60px 8% 30px 8%', color: '#ffffff', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '40px', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '40px', marginBottom: '30px' }}>
-
-          {/* Brand Col */}
-          <div style={{ flex: '1 1 260px', maxWidth: '320px' }}>
-            <h4 style={{ fontSize: '1.15rem', fontWeight: 900, color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', letterSpacing: '0.02em' }}>
-              ✈️ AeroSignal AI
-            </h4>
-            <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.6, margin: 0 }}>
-              Hệ thống ứng dụng AI trong huấn luyện điều phối viên máy bay đầu tiên tại Việt Nam tuân thủ tiêu chuẩn an toàn hàng không ICAO.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '20px', fontSize: '1.1rem' }}>
-              <span>⚙️</span>
-              <span>⚡</span>
-              <span>💻</span>
-            </div>
-          </div>
-
-          {/* Links Col 1 */}
-          <div style={{ flex: '1 1 120px' }}>
-            <h5 style={{ fontSize: '0.76rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>SẢN PHẨM</h5>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.78rem', color: '#94a3b8' }}>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Training Modules</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>AI Documentation</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Aviation Compliance</a></li>
-            </ul>
-          </div>
-
-          {/* Links Col 2 */}
-          <div style={{ flex: '1 1 120px' }}>
-            <h5 style={{ fontSize: '0.76rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>NGHIÊN CỨU</h5>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.78rem', color: '#94a3b8' }}>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Research Paper</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Methodology</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Data Privacy</a></li>
-            </ul>
-          </div>
-
-          {/* Links Col 3 */}
-          <div style={{ flex: '1 1 120px' }}>
-            <h5 style={{ fontSize: '0.76rem', fontWeight: 800, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px 0' }}>HỖ TRỢ</h5>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.78rem', color: '#94a3b8' }}>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Hướng dẫn sử dụng</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Phản hồi</a></li>
-              <li><a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy Policy</a></li>
-            </ul>
-          </div>
-
-        </div>
-
-        {/* Copyright */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '0.74rem', color: '#64748b' }}>
-          <span>© 2026 AeroSignal AI. Student Research Project. ICAO Annex 14 & NATO Standards Compliant.</span>
-          <span>Version V2.0.0 (Cloud Atlas Connected)</span>
-        </div>
-      </footer>
-
     </main>
   );
 };

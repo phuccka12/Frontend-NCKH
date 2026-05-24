@@ -27,10 +27,9 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={`${styles.header} glass-panel`}>
       <div className={styles.logoArea}>
-        <span className={styles.logoIcon} style={{ color: '#0047AB' }}>✈️</span>
         <div className={styles.logoTitleGroup}>
-          <h1 className={styles.logoTitle} style={{ color: '#0047AB', fontWeight: 900 }}>AeroSignal AI</h1>
-          <span className={styles.logoSubtitle} style={{ color: '#64748b', fontSize: '0.66rem', letterSpacing: '0.05em' }}>✈️ AI-POWERED GROUND CONTROL</span>
+          <h1 className={styles.logoTitle} style={{ color: '#0047AB', fontWeight: 900 }}>MarshalLearn AI</h1>
+          <span className={styles.logoSubtitle} style={{ color: '#64748b', fontSize: '0.66rem', letterSpacing: '0.05em' }}>AI-BASED AIRCRAFT MARSHALLING TRAINING</span>
         </div>
       </div>
 

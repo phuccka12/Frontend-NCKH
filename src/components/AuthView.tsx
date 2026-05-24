@@ -110,11 +110,8 @@ export const AuthView: React.FC<AuthViewProps> = ({ socketUrl, onAuthSuccess, on
         )}
         {/* Brand Header */}
         <div className="auth-header">
-          <div className="brand-logo">
-            <Shield size={32} className="logo-icon" />
-          </div>
-          <h1 className="brand-title">AIRCRAFT MARSHALLER</h1>
-          <p className="brand-subtitle">HỆ THỐNG HUẤN LUYỆN ĐIỀU PHỐI AI</p>
+          <h1 className="brand-title">MarshalLearn AI</h1>
+          <p className="brand-subtitle">AI-BASED AIRCRAFT MARSHALLING TRAINING</p>
         </div>
 
         {isSuccess ? (
@@ -199,7 +196,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ socketUrl, onAuthSuccess, on
             )}
 
             <div className="input-group">
-              <label className="input-label">TÊN TÀI KHOẢN (USERNAME)</label>
+              <label className="input-label">TÊN TÀI KHOẢN</label>
               <div className="input-wrapper">
                 <User size={18} className="input-icon" />
                 <input
@@ -214,7 +211,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ socketUrl, onAuthSuccess, on
             </div>
 
             <div className="input-group">
-              <label className="input-label">MẬT KHẨU (PASSWORD)</label>
+              <label className="input-label">MẬT KHẨU</label>
               <div className="input-wrapper">
                 <Lock size={18} className="input-icon" />
                 <input
@@ -237,7 +234,6 @@ export const AuthView: React.FC<AuthViewProps> = ({ socketUrl, onAuthSuccess, on
                 <div className="loader" />
               ) : (
                 <>
-                  <Key size={18} className="btn-icon" />
                   <span>{isLogin ? 'XÁC THỰC HỆ THỐNG' : 'TẠO TÀI KHOẢN MỚI'}</span>
                 </>
               )}
